@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2f6fed">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>個別支援プラン管理</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "Yu Gothic UI", "Meiryo", sans-serif; background: #f3f5f9; color: #22303f; }
+button { font-family: inherit; cursor: pointer; }
+input, select, textarea { font-family: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid #c9d2de; border-radius: 8px; background: #fff; width: 100%; }
+textarea { resize: vertical; min-height: 70px; }
+label { font-size: 12px; color: #5b6b7c; display: block; margin: 8px 0 3px; }
+.screen { display: none; padding: 14px 14px 78px; max-width: 980px; margin: 0 auto; }
+.screen.active { display: block; }
+#screen-org-select.active { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; padding: 20px; }
+nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #dde3ec; display: flex; z-index: 50; }
+nav button { flex: 1; border: none; background: none; padding: 10px 2px 12px; font-size: 12px; color: #5b6b7c; }
+nav button.active { color: #2f6fed; font-weight: 700; }
+h1 { font-size: 20px; margin-bottom: 4px; }
+h2 { font-size: 16px; margin: 18px 0 8px; }
+.sub { color: #5b6b7c; font-size: 13px; margin-bottom: 12px; }
+.card { background: #fff; border: 1px solid #e3e8f0; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+.btn { display: inline-block; border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 700; color: #fff; background: #2f6fed; }
+.btn.sec { background: #eef2f8; color: #2f6fed; border: 1px solid #c9d6ea; }
+.btn.warn { background: #fff; color: #d93025; border: 1px solid #e5b8b3; }
+.btn.small { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+.btn:hover { filter: brightness(0.96); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+table.list { width: 100%; border-collapse: collapse; background: #fff; font-size: 13px; }
+table.list th, table.list td { border: 1px solid #dde3ec; padding: 7px 8px; text-align: left; }
+table.list th { background: #eef2f8; font-size: 12px; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.tag.blue { background: #dbe7ff; color: #1d4ed8; }
+.tag.green { background: #d9f2e3; color: #15803d; }
+.tag.red { background: #fde3e0; color: #b3261e; }
+.tag.gray { background: #e8ecf2; color: #5b6b7c; }
+.tag.orange { background: #fff0d6; color: #b45309; }
+.warn-box { background: #fff7e6; border: 1px solid #f3d9a4; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
+.alert-box { background: #fdecea; border: 1px solid #f3b9b4; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
+.tabs { display: flex; gap: 6px; margin: 12px 0; flex-wrap: wrap; }
+.tabs button { border: 1px solid #c9d2de; background: #fff; border-radius: 20px; padding: 7px 14px; font-size: 13px; }
+.tabs button.active { background: #2f6fed; color: #fff; border-color: #2f6fed; }
+.tabpanel { display: none; }
+.tabpanel.active { display: block; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.hint { font-size: 12px; color: #8a98a8; margin-top: 3px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; flex-wrap: wrap; }
+.org-badge { background: #2f6fed; color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; }
+@media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+#print-area { display: none; }
+@media print {
+  body > .screen, nav { display: none !important; }
+  #print-area { display: block !important; }
+  body { background: #fff; }
+  @page { size: A4; margin: 10mm 12mm; }
+}
+.pf { width: 100%; border-collapse: collapse; font-size: 10.5pt; margin-bottom: 6px; page-break-inside: auto; }
+.pf th, .pf td { border: 1px solid #333; padding: 4px 6px; vertical-align: top; }
+.pf .lab { background: #f0f2f5; font-weight: 700; text-align: center; width: 16%; }
+.pf .lab2 { background: #f0f2f5; font-weight: 700; text-align: center; }
+.pf .biglab { background: #f0f2f5; font-weight: 700; text-align: center; }
+.pf tr { page-break-inside: avoid; }
+.p-title { text-align: center; font-size: 16pt; font-weight: 700; margin: 4px 0 10px; }
+.p-sub { text-align: right; font-size: 9pt; color: #555; margin-bottom: 4px; }
+.p-org { text-align: left; font-size: 10pt; margin-bottom: 8px; }
+.ptext { white-space: pre-wrap; word-break: break-all; }
+.pblank { height: 34px; }
+</style>
+</head>
+<body>
+
+<div id="print-area"></div>
+
+<section class="screen" id="screen-org-select">
+  <div style="width:100%;max-width:460px">
+    <h1 style="font-size:22px">個別支援プラン管理</h1>
+    <p class="sub">利用する事業所を選択してください</p>
+    <div id="orgSelectList"></div>
+    <button class="btn sec" style="width:100%;margin-top:12px" onclick="showScreen('screen-orgs')">＋ 事業所を登録する</button>
+  </div>
+</section>
+
+<section class="screen" id="screen-home">
+  <div class="topbar">
+    <div>
+      <h1 id="homeOrgName">—</h1>
+      <p class="sub" style="margin-bottom:0">ホーム（ダッシュボード）</p>
+    </div>
+    <button class="btn sec small" onclick="toOrgSelect()">事業所を変更</button>
+  </div>
+  <div class="card">
+    <label>検索（利用者・計画・記録）</label>
+    <div class="row">
+      <input id="searchWord" placeholder="氏名・目標・課題・議題など" oninput="renderSearch()">
+    </div>
+    <div id="searchResult"></div>
+  </div>
+  <h2>リマインダー</h2>
+  <div id="reminderList"></div>
+  <h2>達成状況（直近モニタリング）</h2>
+  <div style="overflow-x:auto"><table class="list" id="achieveTable"></table></div>
+</section>
+
+<section class="screen" id="screen-orgs">
+  <h1>事業所設定</h1>
+  <p class="sub">事業所ごとに書式へ自動反映される情報を登録します</p>
+  <div class="card">
+    <h2>事業所を追加</h2>
+    <div class="row">
+      <div style="flex:2;min-width:160px"><input id="orgName" placeholder="事業所名（例: ココロオドルGH）"></div>
+      <div style="flex:1;min-width:120px">
+        <select id="orgType"><option value="グループホーム">グループホーム</option><option value="就労継続支援B型">就労継続支援B型</option><option value="生活介護">生活介護</option><option value="その他">その他</option></select>
+      </div>
+      <button class="btn" onclick="addOrg()">追加</button>
+    </div>
+  </div>
+  <div id="orgList"></div>
+  <button class="btn sec" onclick="toOrgSelect()">← 事業所選択に戻る</button>
+</section>
+
+<section class="screen" id="screen-users">
+  <div class="topbar">
+    <h1>利用者一覧</h1>
+    <button class="btn" onclick="openUserForm()">＋ 新規登録</button>
+  </div>
+  <p class="sub">利用者は法人全体で共有されます（事業所をまたいで共通）</p>
+  <div class="row" style="margin-bottom:10px">
+    <button class="btn sec small" id="usrFilterActive" onclick="setUserFilter('active')">現役のみ</button>
+    <button class="btn sec small" onclick="setUserFilter('closed')">退所のみ</button>
+    <button class="btn sec small" onclick="setUserFilter('all')">すべて</button>
+  </div>
+  <div style="overflow-x:auto"><table class="list" id="userListTable"></table></div>
+</section>
+
+<section class="screen" id="screen-user">
+  <div class="topbar">
+    <div>
+      <h1 id="userDetailName">—</h1>
+      <p class="sub" id="userDetailMeta"></p>
+    </div>
+    <div class="row">
+      <button class="btn sec small" onclick="editUser()">利用者情報を編集</button>
+      <button class="btn sec small" onclick="showScreen('screen-users');renderUsers()">← 一覧</button>
+    </div>
+  </div>
+  <div class="tabs">
+    <button id="tabbtn-face" class="active" onclick="userTab('face')">基本情報</button>
+    <button id="tabbtn-plans" onclick="userTab('plans')">個別支援計画</button>
+    <button id="tabbtn-monitors" onclick="userTab('monitors')">モニタリング</button>
+    <button id="tabbtn-meetings" onclick="userTab('meetings')">会議録</button>
+  </div>
+  <div class="tabpanel active" id="panel-face">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <span style="font-weight:700">フェイスシート（基本情報）</span>
+        <div class="row">
+          <button class="btn sec small" onclick="editFace()">入力・編集</button>
+          <button class="btn small" onclick="printFace()">印刷</button>
+        </div>
+      </div>
+      <div id="faceSummary" class="hint" style="margin-top:8px"></div>
+    </div>
+  </div>
+  <div class="tabpanel" id="panel-plans">
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn" onclick="openPlanForm()">＋ 新規計画（案）</button>
+    </div>
+    <div id="planList"></div>
+  </div>
+  <div class="tabpanel" id="panel-monitors">
+    <div id="monitorList"></div>
+  </div>
+  <div class="tabpanel" id="panel-meetings">
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn" onclick="openMeetingForm()">＋ 会議録を追加</button>
+    </div>
+    <div id="meetingList"></div>
+  </div>
+</section>
+
+<section class="screen" id="screen-plan-form">
+  <h1 id="planFormTitle">個別支援計画</h1>
+  <p class="sub" id="planFormSub"></p>
+  <div class="card">
+    <div class="row">
+      <div style="flex:1;min-width:140px"><label>利用者</label><input id="planUserId" readonly></div>
+      <div style="flex:1;min-width:140px"><label>作成年月日</label><input type="date" id="planCreated"></div>
+      <div style="flex:1;min-width:140px"><label>支援提供期間 開始</label><input type="date" id="planStart"></div>
+      <div style="flex:1;min-width:140px"><label>支援提供期間 終了</label><input type="date" id="planEnd"></div>
+    </div>
+    <div class="row">
+      <div style="flex:1;min-width:160px"><label>事業所名（書式自動反映）</label><input id="planOrgName"></div>
+      <div style="flex:1;min-width:160px"><label>サービス管理責任者（書式自動反映）</label><input id="planManager"></div>
+    </div>
+    <label>総合的な援助の方針</label><textarea id="planPolicy"></textarea>
+    <div class="grid2">
+      <div><label>長期目標</label><textarea id="planLong" style="min-height:80px"></textarea></div>
+      <div><label>短期目標</label><textarea id="planShort" style="min-height:80px"></textarea></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <span style="font-weight:700">具体的な到達目標及び支援計画等</span>
+      <button class="btn sec small" onclick="addPlanItem()">＋ 行を追加</button>
+    </div>
+    <div style="overflow-x:auto"><table class="list" id="planItemsTable" style="min-width:900px">
+      <thead><tr>
+        <th style="width:60px">優先順位</th><th style="width:150px">ニーズ・課題</th><th style="width:170px">具体的な到達目標</th>
+        <th style="width:200px">支援内容（内容・留意点等）</th><th style="width:120px">支援期間</th><th style="width:140px">サービス提供機関（提供者・担当者等）</th><th style="width:110px">前回評価</th><th style="width:46px"></th>
+      </tr></thead>
+      <tbody id="planItemsBody"></tbody>
+    </table></div>
+    <p class="hint">前回評価は引き継ぎ時に自動入力されます（印刷には出ません）</p>
+  </div>
+  <div class="row" style="margin-bottom:10px">
+    <button class="btn" onclick="savePlan()">保存</button>
+    <button class="btn sec" onclick="backToUser()">キャンセル</button>
+  </div>
+</section>
+
+<section class="screen" id="screen-monitor-form">
+  <h1>個別支援計画 モニタリング（6か月）</h1>
+  <p class="sub" id="monitorFormSub"></p>
+  <div class="card">
+    <label>対象の計画</label>
+    <select id="monitorPlanSel" onchange="monitorPlanChanged()"></select>
+    <div id="monitorSnapshot" style="margin-top:10px"></div>
+  </div>
+  <div class="card">
+    <div class="row">
+      <div style="flex:1;min-width:160px"><label>モニタリング実施日</label><input type="date" id="monitorDate"></div>
+      <div style="flex:1;min-width:160px"><label>事業所名</label><input id="monitorOrgName"></div>
+      <div style="flex:1;min-width:160px"><label>サービス管理責任者</label><input id="monitorManager"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <span style="font-weight:700">達成状況の評価</span>
+      <button class="btn sec small" onclick="addMonitorItem()">＋ 行を追加</button>
+    </div>
+    <div style="overflow-x:auto"><table class="list" id="monitorItemsTable" style="min-width:900px">
+      <thead><tr>
+        <th style="width:60px">優先順位</th><th style="width:180px">具体的な到達目標</th><th style="width:160px">達成状況の評価</th>
+        <th style="width:230px">支援内容と課題分析</th><th style="width:230px">今後の対応（変更等）</th><th style="width:46px"></th>
+      </tr></thead>
+      <tbody id="monitorItemsBody"></tbody>
+    </table></div>
+  </div>
+  <div class="card">
+    <div class="grid2">
+      <div><label>現時点での一般就労の可能性</label>
+        <div class="row" id="monJob"></div></div>
+      <div><label>他のサービス移行の可能性</label>
+        <div class="row" id="monTransfer"></div></div>
+      <div><label>他事業所利用の可能性</label>
+        <div class="row" id="monOther"></div></div>
+      <div><label>更新の必要性</label>
+        <div class="row" id="monUpdate"></div></div>
+    </div>
+    <label>上記の判断の理由（一般就労や他のサービスへの移行、他事業所利用の可能性も含めた検討結果）</label>
+    <textarea id="monReason"></textarea>
+  </div>
+  <div class="row" style="margin-bottom:10px">
+    <button class="btn" onclick="saveMonitor()">保存</button>
+    <button class="btn sec" onclick="backToUser()">キャンセル</button>
+  </div>
+</section>
+
+<section class="screen" id="screen-meeting-form">
+  <h1>会 議 録</h1>
+  <p class="sub" id="meetingFormSub"></p>
+  <div class="card">
+    <div class="row">
+      <div style="flex:1;min-width:140px"><label>開催日</label><input type="date" id="mtgDate"></div>
+      <div style="flex:1;min-width:100px"><label>開始時刻</label><input type="time" id="mtgTime"></div>
+      <div style="flex:1;min-width:140px"><label>場所</label><input id="mtgPlace" placeholder="例: 事業所会議室"></div>
+      <div style="flex:1;min-width:160px"><label>対象の計画（任意）</label><select id="mtgPlanSel"><option value="">（紐付けなし）</option></select></div>
+    </div>
+    <label>議題</label><textarea id="mtgAgenda"></textarea>
+    <label>協議内容</label><textarea id="mtgContent"></textarea>
+    <label>決定事項</label><textarea id="mtgDecision"></textarea>
+    <div class="row">
+      <div style="flex:1;min-width:160px"><label>次回予定日</label><input type="date" id="mtgNext"></div>
+      <div style="flex:1;min-width:160px"><label>事業所名</label><input id="mtgOrgName"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <span style="font-weight:700">参加者（氏名・役職を入力。署名・押印は印刷後に手書き）</span>
+      <button class="btn sec small" onclick="addMtgParticipant()">＋ 参加者を追加</button>
+    </div>
+    <table class="list" id="mtgPartTable">
+      <thead><tr><th style="width:40%">氏名</th><th style="width:30%">役職</th><th style="width:30%">署名・押印（印刷後）</th><th style="width:46px"></th></tr></thead>
+      <tbody id="mtgPartBody"></tbody>
+    </table>
+  </div>
+  <div class="row" style="margin-bottom:10px">
+    <button class="btn" onclick="saveMeeting()">保存</button>
+    <button class="btn sec" onclick="backToUser()">キャンセル</button>
+  </div>
+</section>
+
+<section class="screen" id="screen-calendar">
+  <div class="topbar">
+    <h1>年間計画表</h1>
+    <div class="row">
+      <input type="number" id="calYear" style="width:100px" onchange="renderCalendar()">
+      <button class="btn sec small" onclick="renderCalendar()">表示</button>
+    </div>
+  </div>
+  <p class="sub">▲=計画更新月 ／ 開始=計画開始 ／ モ=モニタリング実施</p>
+  <div style="overflow-x:auto"><table class="list" id="calTable"></table></div>
+</section>
+
+<section class="screen" id="screen-data">
+  <h1>データ管理</h1>
+  <p class="sub" id="storageInfo"></p>
+  <div class="card">
+    <h2>CSV出力</h2>
+    <div class="row">
+      <button class="btn sec small" onclick="exportCSV('monitors')">モニタリング</button>
+      <button class="btn sec small" onclick="exportCSV('plans')">個別支援計画</button>
+      <button class="btn sec small" onclick="exportCSV('users')">利用者一覧</button>
+    </div>
+    <p class="hint">Excelで開けるCSV（UTF-8・BOM付き）</p>
+  </div>
+  <div class="card">
+    <h2>Word出力</h2>
+    <div class="row">
+      <select id="wordUserSel" style="max-width:260px"></select>
+      <select id="wordPlanSel" style="max-width:260px"></select>
+      <button class="btn sec small" onclick="exportWord()">計画書をWordで出力</button>
+    </div>
+    <p class="hint">個別支援計画書をWordで開ける形式（.doc）で書き出します</p>
+  </div>
+  <div class="card">
+    <h2>バックアップ</h2>
+    <div class="row">
+      <button class="btn sec small" onclick="exportBackup()">バックアップを書き出す（JSON）</button>
+      <input type="file" id="backupFile" accept=".json,application/json" style="max-width:280px">
+      <button class="btn warn small" onclick="importBackup()">取り込み（全データ上書き）</button>
+    </div>
+    <p class="hint">定期バックアップ推奨。取り込むと現在のデータはすべて置き換わります</p>
+  </div>
+  <div class="card">
+    <h2>永続ストレージ</h2>
+    <p class="hint" id="persistInfo"></p>
+  </div>
+</section>
+
+<nav id="nav">
+  <button id="nav-home" onclick="goHome()">ホーム</button>
+  <button id="nav-users" onclick="showScreen('screen-users');renderUsers()">利用者</button>
+  <button id="nav-cal" onclick="showScreen('screen-calendar');renderCalendar()">年間表</button>
+  <button id="nav-data" onclick="showScreen('screen-data');renderDataScreen()">データ</button>
+  <button id="nav-orgs" onclick="showScreen('screen-orgs');renderOrgs()">事業所</button>
+</nav>
+
+<script>
+"use strict";
+
+// ============ 共通ヘルパー ============
+var DB_NAME = "kobetsu-plan-db", DB_VER = 1, DB = null;
+var STORES = ["orgs", "users", "plans", "monitors", "meetings"];
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function todayStr() {
+  var d = new Date();
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+}
+function pad(n) { return (n < 10 ? "0" : "") + n; }
+function addMonths(dateStr, m) {
+  var p = dateStr.split("-");
+  var d = new Date(+p[0], +p[1] - 1 + m, +p[2]);
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+}
+function fmtJP(dateStr) {
+  if (!dateStr) return "";
+  var p = dateStr.split("-");
+  return +p[0] + "年" + (+p[1]) + "月" + (+p[2]) + "日";
+}
+function fmtJPy(dateStr) {
+  if (!dateStr) return "";
+  var p = dateStr.split("-");
+  var y = +p[0];
+  var era = "西暦" + y;
+  if (y >= 2019) era = "令和" + (y - 2018);
+  else if (y >= 1989) era = "平成" + (y - 1988);
+  return era + "年" + (+p[1]) + "月" + (+p[2]) + "日";
+}
+function calcAge(birthday) {
+  if (!birthday) return "";
+  var p = birthday.split("-");
+  var b = new Date(+p[0], +p[1] - 1, +p[2]);
+  var now = new Date();
+  var age = now.getFullYear() - b.getFullYear();
+  if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age--;
+  return age + "歳";
+}
+function uid() { return "id" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function daysDiff(from, to) { return Math.round((new Date(to) - new Date(from)) / 86400000); }
+function download(filename, content, mime) {
+  var blob = new Blob([content], { type: mime });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
+
+// ============ IndexedDB ============
+function openDB() {
+  return new Promise(function (res, rej) {
+    var req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = function (e) {
+      var db = e.target.result;
+      STORES.forEach(function (s) {
+        if (!db.objectStoreNames.contains(s)) db.createObjectStore(s, { keyPath: "id" });
+      });
+    };
+    req.onsuccess = function (e) { DB = e.target.result; res(DB); };
+    req.onerror = function () { rej(req.error); };
+  });
+}
+function dbGetAll(store) {
+  return new Promise(function (res, rej) {
+    var r = DB.transaction(store, "readonly").objectStore(store).getAll();
+    r.onsuccess = function () { res(r.result); };
+    r.onerror = function () { rej(r.error); };
+  });
+}
+function dbPut(store, obj) {
+  return new Promise(function (res, rej) {
+    var r = DB.transaction(store, "readwrite").objectStore(store).put(obj);
+    r.onsuccess = function () { res(); };
+    r.onerror = function () { rej(r.error); };
+  });
+}
+function dbDel(store, id) {
+  return new Promise(function (res, rej) {
+    var r = DB.transaction(store, "readwrite").objectStore(store).delete(id);
+    r.onsuccess = function () { res(); };
+    r.onerror = function () { rej(r.error); };
+  });
+}
+
+// ============ 状態と画面遷移 ============
+var state = { org: null, user: null, plan: null, monitor: null, meeting: null, userFilter: "active", userTab: "face" };
+
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(function (s) { s.classList.remove("active"); });
+  document.getElementById(id).classList.add("active");
+  ["home", "users", "cal", "data", "orgs"].forEach(function (k) {
+    document.getElementById("nav-" + k).classList.toggle("active", id === "screen-" + k);
+  });
+  window.scrollTo(0, 0);
+}
+function toOrgSelect() {
+  state.org = null;
+  renderOrgSelect();
+  showScreen("screen-org-select");
+}
+function goHome() {
+  if (!state.org) { toOrgSelect(); return; }
+  renderHome();
+  showScreen("screen-home");
+}
+function backToUser() {
+  if (state.user) { renderUserDetail(); showScreen("screen-user"); }
+  else { renderUsers(); showScreen("screen-users"); }
+}
+
+// ============ 事業所選択・設定 ============
+function renderOrgSelect() {
+  var list = document.getElementById("orgSelectList");
+  list.innerHTML = "";
+  dbGetAll("orgs").then(function (orgs) {
+    orgs.sort(function (a, b) { return (a.name || "").localeCompare(b.name || "", "ja"); });
+    if (!orgs.length) {
+      list.innerHTML = '<p class="hint">まだ事業所が登録されていません。「事業所を登録する」から登録してください。</p>';
+      return;
+    }
+    orgs.forEach(function (o) {
+      var d = document.createElement("div");
+      d.className = "card";
+      d.style.cursor = "pointer";
+      d.innerHTML = "<div style='font-weight:700;font-size:16px'>" + esc(o.name) +
+        " <span class='tag blue'>" + esc(o.type || "") + "</span></div>" +
+        (o.manager ? "<div class='hint'>サービス管理責任者: " + esc(o.manager) + "</div>" : "") +
+        "<div class='hint'>この事業所で開く</div>";
+      d.onclick = function () { state.org = o; goHome(); };
+      list.appendChild(d);
+    });
+  });
+}
+function addOrg() {
+  var name = document.getElementById("orgName").value.trim();
+  if (!name) { alert("事業所名を入力してください"); return; }
+  var o = { id: uid(), name: name, type: document.getElementById("orgType").value, manager: "", contact: "" };
+  dbPut("orgs", o).then(function () {
+    document.getElementById("orgName").value = "";
+    renderOrgs(); renderOrgSelect();
+    if (!state.org) showScreen("screen-orgs");
+  });
+}
+function renderOrgs() {
+  var list = document.getElementById("orgList");
+  list.innerHTML = "";
+  dbGetAll("orgs").then(function (orgs) {
+    orgs.sort(function (a, b) { return (a.name || "").localeCompare(b.name || "", "ja"); });
+    orgs.forEach(function (o) {
+      var d = document.createElement("div");
+      d.className = "card";
+      d.innerHTML =
+        '<div class="row" style="justify-content:space-between">' +
+        "<div><strong>" + esc(o.name) + "</strong> <span class='tag blue'>" + esc(o.type || "") + "</span></div>" +
+        "<div class='row'><button class='btn sec small' onclick='editOrg(\"" + o.id + "\")'>編集</button>" +
+        "<button class='btn warn small' onclick='delOrg(\"" + o.id + "\")'>削除</button></div></div>" +
+        "<div class='hint'>責任者: " + esc(o.manager || "未設定") + " ／ 連絡先: " + esc(o.contact || "未設定") + "</div>";
+      list.appendChild(d);
+    });
+  });
+}
+function editOrg(id) {
+  dbGetAll("orgs").then(function (orgs) {
+    var o = orgs.find(function (x) { return x.id === id; });
+    if (!o) return;
+    var manager = prompt("サービス管理責任者氏名（書式に自動反映）", o.manager || "");
+    if (manager === null) return;
+    var contact = prompt("連絡先", o.contact || "");
+    if (contact === null) return;
+    o.manager = manager; o.contact = contact;
+    dbPut("orgs", o).then(function () { renderOrgs(); renderOrgSelect(); });
+  });
+}
+function delOrg(id) {
+  if (!confirm("この事業所を削除しますか？（この事業所に紐づく計画・記録も残りますが、表示されなくなります）")) return;
+  dbDel("orgs", id).then(function () { renderOrgs(); renderOrgSelect(); });
+}
+function fillOrgRefs() {
+  var org = state.org;
+  var m = org ? org.manager : "";
+  var n = org ? org.name : "";
+  document.getElementById("planOrgName").value = n;
+  document.getElementById("planManager").value = m;
+  document.getElementById("monitorOrgName").value = n;
+  document.getElementById("monitorManager").value = m;
+  document.getElementById("mtgOrgName").value = n;
+}
+
+// ============ 利用者 ============
+function renderUsers() {
+  var t = document.getElementById("userListTable");
+  dbGetAll("users").then(function (users) {
+    var f = state.userFilter;
+    var list = users.filter(function (u) { return f === "all" || u.status === f; });
+    list.sort(function (a, b) { return (a.name || "").localeCompare(b.name || "", "ja"); });
+    if (!list.length) {
+      t.innerHTML = "<tr><td style='color:#8a98a8'>該当する利用者がいません</td></tr>";
+      return;
+    }
+    var html = "<tr><th>氏名</th><th>生年月日</th><th>障害・疾患</th><th>ステータス</th><th>操作</th></tr>";
+    list.forEach(function (u) {
+      html += "<tr><td><strong>" + esc(u.name) + "</strong></td>" +
+        "<td>" + esc(u.face.birthday || "") + (u.face.birthday ? "（" + calcAge(u.face.birthday) + "）" : "") + "</td>" +
+        "<td>" + esc(u.face.disability || "") + "</td>" +
+        "<td>" + (u.status === "closed" ? "<span class='tag gray'>退所</span>" : "<span class='tag green'>現役</span>") + "</td>" +
+        "<td><button class='btn sec small' onclick='openUser(\"" + u.id + "\")'>開く</button></td></tr>";
+    });
+    t.innerHTML = html;
+  });
+}
+function setUserFilter(f) {
+  state.userFilter = f;
+  document.getElementById("usrFilterActive").classList.toggle("sec", f !== "active");
+  renderUsers();
+}
+function openUserForm() {
+  var name = prompt("利用者の氏名");
+  if (!name) return;
+  var u = { id: uid(), name: name.trim(), status: "active", face: {} };
+  dbPut("users", u).then(function () { renderUsers(); });
+}
+function openUser(id) {
+  dbGetAll("users").then(function (users) {
+    var u = users.find(function (x) { return x.id === id; });
+    if (!u) return;
+    state.user = u;
+    renderUserDetail();
+    showScreen("screen-user");
+  });
+}
+function editUser() {
+  var u = state.user;
+  var name = prompt("氏名", u.name);
+  if (!name) return;
+  var action = confirm("「退所・終了」にする場合はOK。現役のままの場合はキャンセル。");
+  u.name = name.trim();
+  if (action) { u.status = "closed"; u.closedDate = todayStr(); }
+  dbPut("users", u).then(function () { renderUserDetail(); renderUsers(); });
+}
+function renderUserDetail() {
+  var u = state.user;
+  document.getElementById("userDetailName").textContent = u.name;
+  var meta = [];
+  if (u.face.birthday) meta.push(calcAge(u.face.birthday) + "（" + u.face.birthday + "）");
+  if (u.face.disability) meta.push(u.face.disability);
+  if (u.status === "closed") meta.push("退所済み");
+  document.getElementById("userDetailMeta").textContent = meta.join(" ／ ") || "基本情報は未入力です";
+  var fs = document.getElementById("faceSummary");
+  var f = u.face || {};
+  fs.innerHTML = (f.createDate ? "作成日: " + esc(f.createDate) + "<br>" : "") +
+    (f.agency ? "相談支援事業者: " + esc(f.agency) + "<br>" : "") +
+    (f.overview ? "概要: " + esc(f.overview.slice(0, 80)) + (f.overview.length > 80 ? "…" : "") + "<br>" : "") +
+    (f.address ? "住所: " + esc(f.address) + "<br>" : "") +
+    (f.family && f.family.length ? "家族構成: " + f.family.length + "名登録" : "");
+  renderPlanList(); renderMonitorList(); renderMeetingList();
+}
+function userTab(tab) {
+  state.userTab = tab;
+  ["face", "plans", "monitors", "meetings"].forEach(function (k) {
+    document.getElementById("tabbtn-" + k).classList.toggle("active", k === tab);
+    document.getElementById("panel-" + k).classList.toggle("active", k === tab);
+  });
+}
+
+// ============ 基本情報（フェイスシート） ============
+function editFace() {
+  var u = state.user, f = u.face || {};
+  u.face = f;
+  var name = prompt("氏名", u.name);
+  if (name !== null) { u.name = name.trim(); f.name = u.name; }
+  var birthday = prompt("生年月日（YYYY-MM-DD）", f.birthday || "");
+  if (birthday !== null) f.birthday = birthday.trim();
+  var disability = prompt("障害または疾患名", f.disability || "");
+  if (disability !== null) f.disability = disability;
+  var grade = prompt("障害程度区分", f.grade || "");
+  if (grade !== null) f.grade = grade;
+  var gender = prompt("性別（男/女）", f.gender || "");
+  if (gender !== null) f.gender = gender;
+  var address = prompt("住所", f.address || "");
+  if (address !== null) f.address = address;
+  var phone = prompt("電話番号", f.phone || "");
+  if (phone !== null) f.phone = phone;
+  var fax = prompt("FAX番号", f.fax || "");
+  if (fax !== null) f.fax = fax;
+  var housing = prompt("住居種別（持家/借家/グループホーム/入所施設/医療機関/その他）", f.housing || "");
+  if (housing !== null) f.housing = housing;
+  var agency = prompt("相談支援事業者名", f.agency || "");
+  if (agency !== null) f.agency = agency;
+  var planner = prompt("計画作成担当者", f.planner || "");
+  if (planner !== null) f.planner = planner;
+  var overview = prompt("概要（支援経過・現状と課題等）", f.overview || "");
+  if (overview !== null) f.overview = overview;
+  var life = prompt("生活歴（受診歴含む）", f.life || "");
+  if (life !== null) f.life = life;
+  var medical = prompt("医療の状況（受診科目・頻度・主治医・疾患名・服薬状況等）", f.medical || "");
+  if (medical !== null) f.medical = medical;
+  var selfC = prompt("本人の主訴（意向・希望）", f.selfComplaint || "");
+  if (selfC !== null) f.selfComplaint = selfC;
+  var famC = prompt("家族の主訴（意向・希望）", f.familyComplaint || "");
+  if (famC !== null) f.familyComplaint = famC;
+  if (!f.createDate) f.createDate = todayStr();
+  if (!f.family) f.family = [];
+  if (!f.supports) f.supports = { public: [], other: [] };
+  dbPut("users", u).then(function () { renderUserDetail(); });
+}
+function printFace() {
+  var u = state.user, f = u.face || {};
+  var famRows = (f.family || []).map(function (m) {
+    return "<tr><td>" + esc(m.relation || "") + (m.main ? "（○主たる介護者）" : "") + "</td><td>" + esc(m.name || "") + "</td><td>" + esc(m.age || "") + "</td><td>" + esc(m.job || "") + "</td><td>" + esc(m.note || "") + "</td></tr>";
+  }).join("");
+  if (!famRows) famRows = "<tr><td colspan='5' style='height:60px'></td></tr>";
+  var pubRows = (f.supports && f.supports.public || []).map(function (s) {
+    return "<tr><td>" + esc(s.name || "") + "</td><td>" + esc(s.provider || "") + "</td><td>" + esc(s.content || "") + "</td><td>" + esc(s.freq || "") + "</td><td>" + esc(s.note || "") + "</td></tr>";
+  }).join("");
+  var othRows = (f.supports && f.supports.other || []).map(function (s) {
+    return "<tr><td>" + esc(s.name || "") + "</td><td>" + esc(s.provider || "") + "</td><td>" + esc(s.content || "") + "</td><td>" + esc(s.freq || "") + "</td><td>" + esc(s.note || "") + "</td></tr>";
+  }).join("");
+  var html =
+    '<div class="p-title">フェイスシート（基本情報）</div>' +
+    '<table class="pf"><tr><td class="lab" style="width:22%">作成日</td><td style="width:28%">' + esc(f.createDate || "") + "</td>" +
+    "<td class='lab' style='width:22%'>相談支援事業者名</td><td>" + esc(f.agency || "") + "</td></tr>" +
+    "<tr><td class='lab'>計画作成担当者</td><td>" + esc(f.planner || "") + "</td><td class='lab'>事業所名</td><td>" + esc(state.org ? state.org.name : "") + "</td></tr></table>" +
+    '<table class="pf"><tr><td class="lab2">1　概要（支援経過・現状と課題等）</td></tr>' +
+    "<tr><td class='ptext' style='height:70px'>" + esc(f.overview || "") + "</td></tr></table>" +
+    '<table class="pf"><tr><td class="biglab" colspan="4">2　利用者の現状</td></tr>' +
+    "<tr><td class='lab'>氏名</td><td>" + esc(u.name) + "</td><td class='lab'>生年月日</td><td>" + esc(f.birthday || "") + "（" + (f.birthday ? calcAge(f.birthday) : "") + "）</td></tr>" +
+    "<tr><td class='lab'>障害または疾患名</td><td>" + esc(f.disability || "") + "</td><td class='lab'>障害程度区分</td><td>" + esc(f.grade || "") + "</td></tr>" +
+    "<tr><td class='lab'>性別</td><td>" + esc(f.gender || "") + "</td><td class='lab'>住居種別</td><td>" + esc(f.housing || "") + "</td></tr>" +
+    "<tr><td class='lab'>住所</td><td colspan='3'>" + esc(f.address || "") + "</td></tr>" +
+    "<tr><td class='lab'>電話番号</td><td>" + esc(f.phone || "") + "</td><td class='lab'>FAX番号</td><td>" + esc(f.fax || "") + "</td></tr></table>" +
+    '<table class="pf"><tr><td class="lab2">家族構成（※主たる介護者の氏名に○）</td></tr></table>' +
+    '<table class="pf"><tr><th style="width:18%">続柄</th><th style="width:24%">氏名</th><th style="width:9%">年齢</th><th style="width:24%">職業</th><th>備考</th></tr>' + famRows + "</table>" +
+    '<table class="pf"><tr><td class="lab2">社会関係図（印刷後、手書きで記入）</td></tr>' +
+    '<tr><td class="pblank" style="height:150px"></td></tr></table>' +
+    '<table class="pf"><tr><td class="lab2">生活歴（※受診歴等含む）</td></tr>' +
+    "<tr><td class='ptext' style='height:80px'>" + esc(f.life || "") + "</td></tr></table>" +
+    '<table class="pf"><tr><td class="lab2">医療の状況（※受診科目、頻度、主治医、疾患名、服薬状況等）</td></tr>' +
+    "<tr><td class='ptext' style='height:80px'>" + esc(f.medical || "") + "</td></tr></table>" +
+    '<table class="pf"><tr><td class="lab">本人の主訴（意向・希望）</td><td class="ptext" style="height:60px">' + esc(f.selfComplaint || "") + "</td></tr>" +
+    "<tr><td class='lab'>家族の主訴（意向・希望）</td><td class='ptext' style='height:60px'>" + esc(f.familyComplaint || "") + "</td></tr></table>" +
+    '<table class="pf"><tr><td class="biglab" colspan="5">3　支援の状況</td></tr>' +
+    "<tr><td colspan='5' class='lab2'>公的支援（障害福祉サービス、介護保険等）</td></tr>" +
+    '<tr><th style="width:16%">名称</th><th style="width:22%">提供機関・提供者</th><th style="width:32%">支援の内容</th><th style="width:14%">頻度</th><th>備考</th></tr>' + pubRows + "</table>" +
+    '<table class="pf"><tr><td colspan="5" class="lab2">その他の支援</td></tr>' +
+    '<tr><th style="width:16%">名称</th><th style="width:22%">提供機関・提供者</th><th style="width:32%">支援の内容</th><th style="width:14%">頻度</th><th>備考</th></tr>' + othRows + "</table>";
+  doPrint(html);
+}
+function faceSummaryHTML() {
+  var u = state.user, f = u.face || {};
+  var fam = (f.family || []).map(function (m, i) {
+    return '<div class="row"><span>続柄</span><input value="' + esc(m.relation || "") + '" onchange="setFaceField(\'family\',' + i + ',\'relation\',this.value)">' +
+      '<span>氏名</span><input value="' + esc(m.name || "") + '" onchange="setFaceField(\'family\',' + i + ',\'name\',this.value)">' +
+      '<span>年齢</span><input style="width:70px" value="' + esc(m.age || "") + '" onchange="setFaceField(\'family\',' + i + ',\'age\',this.value)">' +
+      '<span>職業</span><input value="' + esc(m.job || "") + '" onchange="setFaceField(\'family\',' + i + ',\'job\',this.value)">' +
+      '<span>主たる介護者</span><input type="checkbox" ' + (m.main ? "checked" : "") + ' onchange="setFaceField(\'family\',' + i + ',\'main\',this.checked)">' +
+      '<button class="btn warn small" onclick="delFaceRow(\'family\',' + i + ')">×</button></div>';
+  }).join("");
+  return fam;
+}
+
+// ============ 計画一覧・フォーム ============
+function renderPlanList() {
+  var box = document.getElementById("planList");
+  box.innerHTML = "";
+  dbGetAll("plans").then(function (plans) {
+    var list = plans.filter(function (p) { return p.userId === state.user.id && p.orgId === state.org.id; });
+    list.sort(function (a, b) { return (b.version || 1) - (a.version || 1); });
+    if (!list.length) { box.innerHTML = '<p class="hint">まだ計画がありません。「新規計画（案）」から作成してください。</p>'; return; }
+    list.forEach(function (p) {
+      var tag = p.status === "confirmed"
+        ? "<span class='tag green'>確定</span>"
+        : "<span class='tag orange'>案</span>";
+      var d = document.createElement("div");
+      d.className = "card";
+      d.innerHTML =
+        '<div class="row" style="justify-content:space-between">' +
+        "<div><strong>第" + (p.version || 1) + "期</strong> " + tag + " <span class='hint'>" + fmtJP(p.startDate) + "〜" + fmtJP(p.endDate) + "</span></div>" +
+        "<div class='row'>" +
+        "<button class='btn sec small' onclick='printPlan(\"" + p.id + "\")'>印刷</button>" +
+        "<button class='btn sec small' onclick='editPlan(\"" + p.id + "\")'>編集</button>" +
+        "<button class='btn sec small' onclick='openMonitorForm(\"" + p.id + "\")'>モニタリング作成</button>" +
+        "<button class='btn sec small' onclick='openMeetingForm(\"" + p.id + "\")'>会議録</button>" +
+        (p.status === "draft" ? "<button class='btn small' onclick='confirmPlan(\"" + p.id + "\")'>確定する</button>" : "") +
+        "<button class='btn small' onclick='carryPlan(\"" + p.id + "\")'>更新計画を作成</button>" +
+        "<button class='btn warn small' onclick='delPlan(\"" + p.id + "\")'>×</button>" +
+        "</div></div>" +
+        "<div class='hint'>" + (p.policy ? "方針: " + esc(p.policy.slice(0, 60)) + (p.policy.length > 60 ? "…" : "") : "") + "</div>";
+      box.appendChild(d);
+    });
+  });
+}
+function openPlanForm() {
+  state.plan = null;
+  document.getElementById("planFormTitle").textContent = "個別支援計画（新規・案）";
+  document.getElementById("planFormSub").textContent = "利用者: " + state.user.name + " ／ 事業所: " + (state.org ? state.org.name : "");
+  document.getElementById("planUserId").value = state.user.name;
+  document.getElementById("planCreated").value = todayStr();
+  var start = todayStr();
+  document.getElementById("planStart").value = start;
+  document.getElementById("planEnd").value = addMonths(start, 6);
+  document.getElementById("planPolicy").value = "";
+  document.getElementById("planLong").value = "";
+  document.getElementById("planShort").value = "";
+  document.getElementById("planItemsBody").innerHTML = "";
+  fillOrgRefs();
+  addPlanItem();
+  showScreen("screen-plan-form");
+}
+function editPlan(id) {
+  dbGetAll("plans").then(function (plans) {
+    var p = plans.find(function (x) { return x.id === id; });
+    if (!p) return;
+    state.plan = p;
+    document.getElementById("planFormTitle").textContent = "個別支援計画（第" + (p.version || 1) + "期" + (p.status === "confirmed" ? "・確定" : "・案") + "）";
+    document.getElementById("planFormSub").textContent = "利用者: " + state.user.name + " ／ 事業所: " + (state.org ? state.org.name : "");
+    document.getElementById("planUserId").value = state.user.name;
+    document.getElementById("planCreated").value = p.createdDate;
+    document.getElementById("planStart").value = p.startDate;
+    document.getElementById("planEnd").value = p.endDate;
+    document.getElementById("planPolicy").value = p.policy || "";
+    document.getElementById("planLong").value = p.longGoal || "";
+    document.getElementById("planShort").value = p.shortGoal || "";
+    document.getElementById("planOrgName").value = p.orgName || (state.org ? state.org.name : "");
+    document.getElementById("planManager").value = p.manager || (state.org ? state.org.manager : "");
+    document.getElementById("planItemsBody").innerHTML = "";
+    (p.items || []).forEach(function (it) { addPlanItem(it); });
+    if (!p.items || !p.items.length) addPlanItem();
+    showScreen("screen-plan-form");
+  });
+}
+function addPlanItem(it) {
+  it = it || {};
+  var tr = document.createElement("tr");
+  tr.innerHTML =
+    '<td><input value="' + esc(it.priority || "") + '"></td>' +
+    '<td><textarea style="min-height:44px">' + esc(it.need || "") + "</textarea></td>" +
+    '<td><textarea style="min-height:44px">' + esc(it.goal || "") + "</textarea></td>" +
+    '<td><textarea style="min-height:44px">' + esc(it.support || "") + "</textarea></td>" +
+    '<td><input value="' + esc(it.period || "") + '"></td>' +
+    '<td><textarea style="min-height:44px">' + esc(it.provider || "") + "</textarea></td>" +
+    '<td style="text-align:center">' + (it.prevEval ? "<span class='tag gray'>" + esc(it.prevEval) + "</span>" : "") + "</td>" +
+    "<td><button class='btn warn small' onclick='this.parentElement.parentElement.remove()'>×</button></td>";
+  document.getElementById("planItemsBody").appendChild(tr);
+}
+function collectPlanItems() {
+  var items = [];
+  document.querySelectorAll("#planItemsBody tr").forEach(function (tr) {
+    var c = tr.children;
+    var item = {
+      priority: c[0].querySelector("input").value,
+      need: c[1].querySelector("textarea").value,
+      goal: c[2].querySelector("textarea").value,
+      support: c[3].querySelector("textarea").value,
+      period: c[4].querySelector("input").value,
+      provider: c[5].querySelector("textarea").value,
+      prevEval: c[6].textContent.trim()
+    };
+    if (item.goal || item.support || item.need) items.push(item);
+  });
+  return items;
+}
+function savePlan() {
+  var p = state.plan || {
+    id: uid(), orgId: state.org.id, userId: state.user.id, status: "draft",
+    version: 1, createdAt: Date.now()
+  };
+  p.createdDate = document.getElementById("planCreated").value;
+  p.startDate = document.getElementById("planStart").value;
+  p.endDate = document.getElementById("planEnd").value;
+  p.policy = document.getElementById("planPolicy").value;
+  p.longGoal = document.getElementById("planLong").value;
+  p.shortGoal = document.getElementById("planShort").value;
+  p.orgName = document.getElementById("planOrgName").value;
+  p.manager = document.getElementById("planManager").value;
+  p.items = collectPlanItems();
+  dbPut("plans", p).then(function () {
+    state.plan = null;
+    renderUserDetail();
+    showScreen("screen-user");
+  });
+}
+function confirmPlan(id) {
+  if (!confirm("この計画を確定しますか？（同意日を記録し、「案」表示が外れます）")) return;
+  dbGetAll("plans").then(function (plans) {
+    var p = plans.find(function (x) { return x.id === id; });
+    if (!p) return;
+    p.status = "confirmed"; p.confirmedDate = todayStr();
+    dbPut("plans", p).then(function () { renderUserDetail(); });
+  });
+}
+function carryPlan(id) {
+  if (!confirm("第◯期から更新計画を作成します。前回計画と直近のモニタリング結果が引き継がれます。")) return;
+  dbGetAll("plans").then(function (plans) {
+    var p = plans.find(function (x) { return x.id === id; });
+    if (!p) return;
+    var newP = {
+      id: uid(), orgId: p.orgId, userId: p.userId, status: "draft",
+      version: (p.version || 1) + 1, prevPlanId: p.id, createdAt: Date.now(),
+      createdDate: todayStr(),
+      startDate: addMonths(p.endDate, 1),
+      endDate: addMonths(addMonths(p.endDate, 1), 6),
+      policy: p.policy, longGoal: p.longGoal, shortGoal: p.shortGoal,
+      orgName: p.orgName, manager: p.manager,
+      items: (p.items || []).map(function (it) { return { priority: it.priority, need: it.need, goal: it.goal, support: it.support, period: it.period, provider: it.provider, prevEval: "" }; })
+    };
+    dbGetAll("monitors").then(function (mons) {
+      var ms = mons.filter(function (m) { return m.planId === p.id; });
+      ms.sort(function (a, b) { return (a.date || "").localeCompare(b.date || ""); });
+      var latest = ms[ms.length - 1];
+      if (latest) {
+        newP.items.forEach(function (it, i) {
+          var lm = latest.items[i];
+          if (lm && lm.eval) it.prevEval = lm.eval;
+        });
+      }
+      dbPut("plans", newP).then(function () {
+        state.plan = newP;
+        editPlan(newP.id);
+      });
+    });
+  });
+}
+function delPlan(id) {
+  if (!confirm("この計画を削除しますか？（紐づくモニタリング・会議録も対象外になります）")) return;
+  dbDel("plans", id).then(function () { renderUserDetail(); });
+}
+
+// ============ モニタリング ============
+function renderMonitorList() {
+  var box = document.getElementById("monitorList");
+  box.innerHTML = "";
+  dbGetAll("monitors").then(function (mons) {
+    dbGetAll("plans").then(function (plans) {
+      var list = mons.filter(function (m) { return m.userId === state.user.id && m.orgId === state.org.id; });
+      list.sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+      if (!list.length) { box.innerHTML = '<p class="hint">まだモニタリング記録がありません。計画から「モニタリング作成」してください。</p>'; return; }
+      list.forEach(function (m) {
+        var p = plans.find(function (x) { return x.id === m.planId; });
+        var d = document.createElement("div");
+        d.className = "card";
+        var evals = (m.items || []).map(function (it) { return it.eval; }).filter(Boolean);
+        var tags = "";
+        evals.forEach(function (e) {
+          var c = e === "達成" ? "green" : (e === "ほぼ達成" ? "orange" : "red");
+          tags += "<span class='tag " + c + "' style='margin-right:4px'>" + esc(e) + "</span>";
+        });
+        d.innerHTML =
+          '<div class="row" style="justify-content:space-between">' +
+          "<div><strong>" + fmtJP(m.date) + "</strong> <span class='hint'>" + (p ? "第" + (p.version || 1) + "期の計画" : "（計画削除済み）") + "</span><br>" + tags + "</div>" +
+          "<div class='row'>" +
+          "<button class='btn sec small' onclick='printMonitor(\"" + m.id + "\")'>印刷</button>" +
+          "<button class='btn sec small' onclick='editMonitor(\"" + m.id + "\")'>編集</button>" +
+          "<button class='btn warn small' onclick='delMonitor(\"" + m.id + "\")'>×</button></div></div>" +
+          (m.updateNeeded === "あり" ? "<div class='hint' style='color:#b3261e'>更新の必要性: あり（" + esc((m.reason || "").slice(0, 40)) + "）</div>" : "");
+        box.appendChild(d);
+      });
+    });
+  });
+}
+function openMonitorForm(planId) {
+  state.monitor = null;
+  document.getElementById("monitorFormSub").textContent = "利用者: " + state.user.name + " ／ 事業所: " + (state.org ? state.org.name : "");
+  document.getElementById("monitorDate").value = todayStr();
+  fillOrgRefs();
+  dbGetAll("plans").then(function (plans) {
+    var sel = document.getElementById("monitorPlanSel");
+    var opts = plans.filter(function (p) { return p.userId === state.user.id && p.orgId === state.org.id; });
+    opts.sort(function (a, b) { return (b.version || 1) - (a.version || 1); });
+    sel.innerHTML = opts.map(function (p) {
+      return "<option value='" + p.id + "'>第" + (p.version || 1) + "期 " + fmtJP(p.startDate) + "〜" + fmtJP(p.endDate) + (p.status === "confirmed" ? "（確定）" : "（案）") + "</option>";
+    }).join("");
+    sel.value = planId || (opts[0] ? opts[0].id : "");
+    monitorPlanChanged();
+  });
+  document.getElementById("monitorItemsBody").innerHTML = "";
+  addMonitorItem();
+  setYN("monJob", ""); setYN("monTransfer", ""); setYN("monOther", ""); setYN("monUpdate", "");
+  document.getElementById("monReason").value = "";
+  showScreen("screen-monitor-form");
+}
+function monitorPlanChanged() {
+  var pid = document.getElementById("monitorPlanSel").value;
+  if (!pid) { document.getElementById("monitorSnapshot").innerHTML = '<p class="hint">対象の計画を選択してください</p>'; return; }
+  dbGetAll("plans").then(function (plans) {
+    var p = plans.find(function (x) { return x.id === pid; });
+    if (!p) return;
+    var box = document.getElementById("monitorSnapshot");
+    box.innerHTML =
+      '<div style="background:#f7f9fc;border:1px solid #e3e8f0;border-radius:10px;padding:12px">' +
+      "<div class='hint'><strong>計画から自動引用（当時の内容を固定保存します）</strong></div>" +
+      "<div>作成年月日: " + esc(fmtJP(p.createdDate)) + " ／ 支援提供期間: " + esc(fmtJP(p.startDate)) + "〜" + esc(fmtJP(p.endDate)) + "</div>" +
+      "<div style='margin-top:6px'><strong>総合的な援助の方針:</strong><br><span class='ptext'>" + esc(p.policy || "") + "</span></div>" +
+      "<div style='margin-top:6px'><strong>長期目標:</strong> " + esc(p.longGoal || "") + "</div>" +
+      "<div><strong>短期目標:</strong> " + esc(p.shortGoal || "") + "</div></div>";
+    document.getElementById("monitorItemsBody").innerHTML = "";
+    (p.items || []).forEach(function (it) { addMonitorItem({ priority: it.priority, goal: it.goal }); });
+    if (!p.items || !p.items.length) addMonitorItem();
+  });
+}
+function addMonitorItem(it) {
+  it = it || {};
+  var tr = document.createElement("tr");
+  tr.innerHTML =
+    '<td><input value="' + esc(it.priority || "") + '"></td>' +
+    '<td><textarea style="min-height:44px">' + esc(it.goal || "") + "</textarea></td>" +
+    '<td><div class="row" style="gap:4px">' +
+    ["達成", "ほぼ達成", "未達成"].map(function (v) {
+      return "<label style='display:inline-flex;align-items:center;gap:3px;margin:0;font-size:12px'><input type='radio' name='evalrow' value='" + v + "' " + (it.eval === v ? "checked" : "") + ">" + v + "</label>";
+    }).join("") + "</div></td>" +
+    '<td><textarea style="min-height:44px">' + esc(it.analysis || "") + "</textarea></td>" +
+    '<td><textarea style="min-height:44px">' + esc(it.action || "") + "</textarea></td>" +
+    "<td><button class='btn warn small' onclick='this.parentElement.parentElement.remove()'>×</button></td>";
+  document.getElementById("monitorItemsBody").appendChild(tr);
+}
+function collectMonitorItems() {
+  var items = [];
+  document.querySelectorAll("#monitorItemsBody tr").forEach(function (tr) {
+    var c = tr.children;
+    var evalEl = c[2].querySelector("input[type=radio]:checked");
+    var item = {
+      priority: c[0].querySelector("input").value,
+      goal: c[1].querySelector("textarea").value,
+      eval: evalEl ? evalEl.value : "",
+      analysis: c[3].querySelector("textarea").value,
+      action: c[4].querySelector("textarea").value
+    };
+    if (item.goal || item.analysis || item.action || item.eval) items.push(item);
+  });
+  return items;
+}
+function setYN(id, val) {
+  var box = document.getElementById(id);
+  box.innerHTML = ["あり", "なし"].map(function (v) {
+    return "<label style='display:inline-flex;align-items:center;gap:3px;margin:0;font-size:14px'><input type='radio' name='" + id + "' value='" + v + "' " + (val === v ? "checked" : "") + ">" + v + "</label>";
+  }).join("");
+}
+function saveMonitor() {
+  var pid = document.getElementById("monitorPlanSel").value;
+  if (!pid) { alert("対象の計画を選択してください"); return; }
+  dbGetAll("plans").then(function (plans) {
+    var p = plans.find(function (x) { return x.id === pid; });
+    var m = state.monitor || { id: uid(), orgId: state.org.id, userId: state.user.id, planId: pid, createdAt: Date.now() };
+    m.planId = pid;
+    m.date = document.getElementById("monitorDate").value;
+    m.orgName = document.getElementById("monitorOrgName").value;
+    m.manager = document.getElementById("monitorManager").value;
+    m.job = YN("monJob"); m.transfer = YN("monTransfer"); m.otherOrg = YN("monOther");
+    m.updateNeeded = YN("monUpdate");
+    m.reason = document.getElementById("monReason").value;
+    m.items = collectMonitorItems();
+    if (p) {
+      m.planInfo = {
+        planId: p.id, version: p.version || 1, createdDate: p.createdDate,
+        startDate: p.startDate, endDate: p.endDate, policy: p.policy,
+        longGoal: p.longGoal, shortGoal: p.shortGoal
+      };
+    }
+    dbPut("monitors", m).then(function () {
+      state.monitor = null;
+      renderUserDetail();
+      showScreen("screen-user");
+    });
+  });
+}
+function YN(id) {
+  var el = document.querySelector("#" + id + " input[type=radio]:checked");
+  return el ? el.value : "";
+}
+function editMonitor(id) {
+  dbGetAll("monitors").then(function (mons) {
+    var m = mons.find(function (x) { return x.id === id; });
+    if (!m) return;
+    state.monitor = m;
+    document.getElementById("monitorFormSub").textContent = "利用者: " + state.user.name + " ／ 事業所: " + (state.org ? state.org.name : "") + " ／ 編集";
+    document.getElementById("monitorDate").value = m.date;
+    document.getElementById("monitorOrgName").value = m.orgName;
+    document.getElementById("monitorManager").value = m.manager;
+    setYN("monJob", m.job || ""); setYN("monTransfer", m.transfer || "");
+    setYN("monOther", m.otherOrg || ""); setYN("monUpdate", m.updateNeeded || "");
+    document.getElementById("monReason").value = m.reason || "";
+    dbGetAll("plans").then(function (plans) {
+      var sel = document.getElementById("monitorPlanSel");
+      var opts = plans.filter(function (p) { return p.userId === state.user.id && p.orgId === state.org.id; });
+      opts.sort(function (a, b) { return (b.version || 1) - (a.version || 1); });
+      sel.innerHTML = opts.map(function (p) {
+        return "<option value='" + p.id + "'>第" + (p.version || 1) + "期 " + fmtJP(p.startDate) + "〜" + fmtJP(p.endDate) + "</option>";
+      }).join("");
+      sel.value = m.planId;
+      if (m.planInfo) {
+        var pi = m.planInfo;
+        document.getElementById("monitorSnapshot").innerHTML =
+          '<div style="background:#f7f9fc;border:1px solid #e3e8f0;border-radius:10px;padding:12px">' +
+          "<div class='hint'><strong>記録作成時の計画内容（固定保存）</strong></div>" +
+          "<div>作成年月日: " + esc(fmtJP(pi.createdDate)) + " ／ 支援提供期間: " + esc(fmtJP(pi.startDate)) + "〜" + esc(fmtJP(pi.endDate)) + "</div>" +
+          "<div style='margin-top:6px'><strong>総合的な援助の方針:</strong><br>" + esc(pi.policy || "") + "</div></div>";
+      } else {
+        monitorPlanChanged();
+      }
+      document.getElementById("monitorItemsBody").innerHTML = "";
+      (m.items || []).forEach(function (it) { addMonitorItem(it); });
+      if (!m.items || !m.items.length) addMonitorItem();
+    });
+    showScreen("screen-monitor-form");
+  });
+}
+function delMonitor(id) {
+  if (!confirm("このモニタリング記録を削除しますか？")) return;
+  dbDel("monitors", id).then(function () { renderUserDetail(); });
+}
+
+// ============ 会議録 ============
+function renderMeetingList() {
+  var box = document.getElementById("meetingList");
+  box.innerHTML = "";
+  dbGetAll("meetings").then(function (mtgs) {
+    var list = mtgs.filter(function (m) { return m.userId === state.user.id && m.orgId === state.org.id; });
+    list.sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+    if (!list.length) { box.innerHTML = '<p class="hint">会議録はまだありません。</p>'; return; }
+    list.forEach(function (m) {
+      var d = document.createElement("div");
+      d.className = "card";
+      d.innerHTML =
+        '<div class="row" style="justify-content:space-between">' +
+        "<div><strong>" + fmtJP(m.date) + "</strong> " + esc(m.time || "") + (m.place ? " ／ " + esc(m.place) : "") +
+        (m.agenda ? "<br><span class='hint'>議題: " + esc(m.agenda.slice(0, 50)) + "</span>" : "") + "</div>" +
+        "<div class='row'>" +
+        "<button class='btn sec small' onclick='printMeeting(\"" + m.id + "\")'>印刷</button>" +
+        "<button class='btn sec small' onclick='editMeeting(\"" + m.id + "\")'>編集</button>" +
+        "<button class='btn warn small' onclick='delMeeting(\"" + m.id + "\")'>×</button></div></div>";
+      box.appendChild(d);
+    });
+  });
+}
+function openMeetingForm() {
+  state.meeting = null;
+  document.getElementById("meetingFormSub").textContent = "利用者: " + state.user.name + " ／ 事業所: " + (state.org ? state.org.name : "");
+  document.getElementById("mtgDate").value = todayStr();
+  document.getElementById("mtgTime").value = "";
+  document.getElementById("mtgPlace").value = "";
+  document.getElementById("mtgAgenda").value = "";
+  document.getElementById("mtgContent").value = "";
+  document.getElementById("mtgDecision").value = "";
+  document.getElementById("mtgNext").value = "";
+  fillOrgRefs();
+  fillMtgPlanSel("");
+  document.getElementById("mtgPartBody").innerHTML = "";
+  addMtgParticipant(); addMtgParticipant();
+  showScreen("screen-meeting-form");
+}
+function fillMtgPlanSel(selVal) {
+  var sel = document.getElementById("mtgPlanSel");
+  dbGetAll("plans").then(function (plans) {
+    var opts = plans.filter(function (p) { return p.userId === state.user.id && p.orgId === state.org.id; });
+    opts.sort(function (a, b) { return (b.version || 1) - (a.version || 1); });
+    sel.innerHTML = "<option value=''>（紐付けなし）</option>" + opts.map(function (p) {
+      return "<option value='" + p.id + "' " + (selVal === p.id ? "selected" : "") + ">第" + (p.version || 1) + "期 " + fmtJP(p.startDate) + "〜" + fmtJP(p.endDate) + "</option>";
+    }).join("");
+  });
+}
+function addMtgParticipant(part) {
+  part = part || {};
+  var tr = document.createElement("tr");
+  tr.innerHTML =
+    '<td><input value="' + esc(part.name || "") + '"></td>' +
+    '<td><input value="' + esc(part.role || "") + '"></td>' +
+    "<td><div class='pblank' style='height:30px'></div></td>" +
+    "<td><button class='btn warn small' onclick='this.parentElement.parentElement.remove()'>×</button></td>";
+  document.getElementById("mtgPartBody").appendChild(tr);
+}
+function collectParticipants() {
+  var list = [];
+  document.querySelectorAll("#mtgPartBody tr").forEach(function (tr) {
+    var c = tr.children;
+    var name = c[0].querySelector("input").value;
+    var role = c[1].querySelector("input").value;
+    if (name) list.push({ name: name, role: role });
+  });
+  return list;
+}
+function saveMeeting() {
+  var m = state.meeting || { id: uid(), orgId: state.org.id, userId: state.user.id, createdAt: Date.now() };
+  m.date = document.getElementById("mtgDate").value;
+  m.time = document.getElementById("mtgTime").value;
+  m.place = document.getElementById("mtgPlace").value;
+  m.planId = document.getElementById("mtgPlanSel").value;
+  m.agenda = document.getElementById("mtgAgenda").value;
+  m.content = document.getElementById("mtgContent").value;
+  m.decision = document.getElementById("mtgDecision").value;
+  m.nextDate = document.getElementById("mtgNext").value;
+  m.orgName = document.getElementById("mtgOrgName").value;
+  m.participants = collectParticipants();
+  dbPut("meetings", m).then(function () {
+    state.meeting = null;
+    renderUserDetail();
+    showScreen("screen-user");
+  });
+}
+function editMeeting(id) {
+  dbGetAll("meetings").then(function (mtgs) {
+    var m = mtgs.find(function (x) { return x.id === id; });
+    if (!m) return;
+    state.meeting = m;
+    document.getElementById("meetingFormSub").textContent = "利用者: " + state.user.name + " ／ 事業所: " + (state.org ? state.org.name : "") + " ／ 編集";
+    document.getElementById("mtgDate").value = m.date;
+    document.getElementById("mtgTime").value = m.time || "";
+    document.getElementById("mtgPlace").value = m.place || "";
+    document.getElementById("mtgAgenda").value = m.agenda || "";
+    document.getElementById("mtgContent").value = m.content || "";
+    document.getElementById("mtgDecision").value = m.decision || "";
+    document.getElementById("mtgNext").value = m.nextDate || "";
+    document.getElementById("mtgOrgName").value = m.orgName || "";
+    fillMtgPlanSel(m.planId || "");
+    document.getElementById("mtgPartBody").innerHTML = "";
+    (m.participants || []).forEach(function (p) { addMtgParticipant(p); });
+    if (!m.participants || !m.participants.length) { addMtgParticipant(); addMtgParticipant(); }
+    showScreen("screen-meeting-form");
+  });
+}
+function delMeeting(id) {
+  if (!confirm("この会議録を削除しますか？")) return;
+  dbDel("meetings", id).then(function () { renderUserDetail(); });
+}
+
+// ============ 印刷 ============
+function doPrint(html) {
+  document.getElementById("print-area").innerHTML = html;
+  window.print();
+  document.getElementById("print-area").innerHTML = "";
+}
+function printPlan(id) {
+  dbGetAll("plans").then(function (plans) {
+    var p = plans.find(function (x) { return x.id === id; });
+    if (!p) return;
+    var draftMark = p.status === "draft" ? '<div style="text-align:center;font-size:14pt;font-weight:700;color:#b3261e">（案）</div>' : "";
+    var itemRows = (p.items || []).map(function (it) {
+      return "<tr><td style='text-align:center'>" + esc(it.priority || "") + "</td><td>" + esc(it.need || "") + "</td><td>" + esc(it.goal || "") + "</td><td>" + esc(it.support || "") + "</td><td>" + esc(it.period || "") + "</td><td>" + esc(it.provider || "") + "</td></tr>";
+    }).join("");
+    var html =
+      '<div class="p-title">個別支援計画</div>' + draftMark +
+      '<table class="pf"><tr><td class="lab">利用者氏名</td><td>' + esc(state.user.name) + "</td>" +
+      "<td class='lab'>個別支援計画<br>作成年月日</td><td>　" + fmtJPy(p.createdDate) + "</td></tr>" +
+      "<tr><td class='lab'>支援提供期間</td><td colspan='3'>　" + fmtJPy(p.startDate) + " から　" + fmtJPy(p.endDate) + " まで</td></tr></table>" +
+      '<table class="pf"><tr><td class="lab2">総合的な援助の方針</td></tr>' +
+      "<tr><td class='ptext' style='min-height:60px'>" + esc(p.policy || "") + "</td></tr></table>" +
+      '<table class="pf"><tr><td class="biglab" rowspan="2" style="width:12%">到 達 目 標</td>' +
+      '<td class="lab" style="width:14%">長期目標</td><td class="ptext">' + esc(p.longGoal || "") + "</td></tr>" +
+      "<tr><td class='lab'>短期目標</td><td class='ptext'>" + esc(p.shortGoal || "") + "</td></tr></table>" +
+      '<table class="pf"><tr><td class="biglab" colspan="6">具体的な到達目標及び支援計画等</td></tr>' +
+      '<tr><th style="width:8%">優先順位</th><th style="width:17%">ニーズ・課題</th><th style="width:18%">具体的な到達目標</th><th style="width:25%">支援内容<br>（内容、留意点等）</th><th style="width:13%">支援期間</th><th style="width:19%">サービス提供機関<br>（提供者・担当者等）</th></tr>' +
+      itemRows + "</table>" +
+      '<table class="pf"><tr><td class="lab">事業所名</td><td>' + esc(p.orgName || "") + "</td></tr>" +
+      "<tr><td class='lab' style='width:16%'>　　" + fmtJPy(p.confirmedDate || "") + "</td><td style='width:40%'>利用者氏名　" + esc(state.user.name) + "</td>" +
+      "<td class='lab' style='width:16%'>サービス管理責任者</td><td>" + esc(p.manager || "") + "</td></tr></table>";
+    doPrint(html);
+  });
+}
+function printMonitor(id) {
+  dbGetAll("monitors").then(function (mons) {
+    var m = mons.find(function (x) { return x.id === id; });
+    if (!m) return;
+    var pi = m.planInfo || {};
+    var rows = (m.items || []).map(function (it) {
+      return "<tr><td style='text-align:center'>" + esc(it.priority || "") + "</td><td>" + esc(it.goal || "") + "</td>" +
+        "<td style='text-align:center'>" + ["達成", "ほぼ達成", "未達成"].map(function (v) {
+          return "<span style='margin-right:8px'>" + (it.eval === v ? "●" : "○") + v + "</span>";
+        }).join("") + "</td>" +
+        "<td>" + esc(it.analysis || "") + "</td><td>" + esc(it.action || "") + "</td></tr>";
+    }).join("");
+    var yn = function (v) { return v === "あり" ? "○あり　・　なし" : (v === "なし" ? "あり　・　○なし" : "あり　・　なし"); };
+    var html =
+      '<div class="p-title">個別支援計画　モニタリング（６か月）</div>' +
+      '<table class="pf"><tr><td class="lab">利用者氏名</td><td>' + esc(state.user.name) + "</td>" +
+      "<td class='lab'>個別支援計画<br>作成年月日</td><td>　" + fmtJPy(pi.createdDate) + "</td></tr>" +
+      "<tr><td class='lab'>支援提供期間</td><td colspan='3'>　" + fmtJPy(pi.startDate) + " から　" + fmtJPy(pi.endDate) + " まで</td></tr></table>" +
+      '<table class="pf"><tr><td class="lab2">総合的な援助の方針</td></tr>' +
+      "<tr><td class='ptext' style='min-height:50px'>" + esc(pi.policy || "") + "</td></tr></table>" +
+      '<table class="pf"><tr><td class="biglab" rowspan="2" style="width:12%">到 達 目 標</td>' +
+      '<td class="lab" style="width:14%">長期目標</td><td class="ptext">' + esc(pi.longGoal || "") + "</td></tr>" +
+      "<tr><td class='lab'>短期目標</td><td class='ptext'>" + esc(pi.shortGoal || "") + "</td></tr></table>" +
+      '<table class="pf"><tr><td class="biglab" colspan="5">達成状況の評価</td></tr>' +
+      '<tr><th style="width:8%">優先順位</th><th style="width:20%">具体的な到達目標</th><th style="width:24%">達成状況の評価</th><th style="width:26%">支援内容と課題分析</th><th style="width:22%">今後の対応<br>（支援内容・方法の変更等）</th></tr>' +
+      rows + "</table>" +
+      '<table class="pf"><tr><td class="lab">現時点での<br>一般就労の可能性</td><td style="width:26%">' + yn(m.job) + '</td>' +
+      '<td class="lab">他のサービス移行<br>の可能性</td><td style="width:26%">' + yn(m.transfer) + "</td>" +
+      "<td class='lab'>他事業所利用<br>の可能性</td><td>" + yn(m.otherOrg) + "</td></tr>" +
+      "<tr><td class='lab'>更新の必要性</td><td>" + yn(m.updateNeeded) + "</td><td colspan='4' class='hint' style='font-size:9pt'>※全て あり・なし いずれかに○をつけ、下に理由を記入</td></tr></table>" +
+      '<table class="pf"><tr><td class="lab2">上記の判断の理由（一般就労や他のサービスへの移行、他事業所利用の可能性も含めた検討結果）</td></tr>' +
+      "<tr><td class='ptext' style='min-height:80px'>" + esc(m.reason || "") + "</td></tr></table>" +
+      '<table class="pf"><tr><td class="lab">事業所名</td><td>' + esc(m.orgName || "") + "</td><td class='lab'>モニタリング実施日</td><td>" + fmtJPy(m.date) + "</td>" +
+      "<td class='lab'>サービス管理責任者</td><td>" + esc(m.manager || "") + "</td></tr></table>";
+    doPrint(html);
+  });
+}
+function printMeeting(id) {
+  dbGetAll("meetings").then(function (mtgs) {
+    var m = mtgs.find(function (x) { return x.id === id; });
+    if (!m) return;
+    var rows = (m.participants || []).map(function (p) {
+      return "<tr><td style='text-align:center'>" + esc(p.name) + "</td><td style='text-align:center'>" + esc(p.role || "") + "</td><td class='pblank' style='height:36px'></td></tr>";
+    }).join("");
+    if (!rows) rows = "<tr><td class='pblank' style='height:36px'></td><td></td><td></td></tr>";
+    var html =
+      '<div class="p-title">会 議 録</div>' +
+      '<table class="pf"><tr><td class="lab">開催日時</td><td>' + fmtJPy(m.date) + " " + esc(m.time || "") + "</td>" +
+      "<td class='lab'>場所</td><td>" + esc(m.place || "") + "</td></tr>" +
+      "<tr><td class='lab'>対象利用者</td><td>" + esc(state.user.name) + "</td>" +
+      "<td class='lab'>事業所名</td><td>" + esc(m.orgName || "") + "</td></tr></table>" +
+      '<table class="pf"><tr><td class="lab">議題</td><td class="ptext" style="min-height:50px">' + esc(m.agenda || "") + "</td></tr>" +
+      "<tr><td class='lab'>協議内容</td><td class='ptext' style='min-height:100px'>" + esc(m.content || "") + "</td></tr>" +
+      "<tr><td class='lab'>決定事項</td><td class='ptext' style='min-height:60px'>" + esc(m.decision || "") + "</td></tr>" +
+      "<tr><td class='lab'>次回予定</td><td>" + fmtJPy(m.nextDate) + "</td></tr></table>" +
+      '<table class="pf"><tr><td class="lab2">参加者（署名・押印）</td></tr></table>' +
+      '<table class="pf"><tr><th style="width:34%">氏名</th><th style="width:26%">役職</th><th style="width:40%">署名・押印</th></tr>' + rows + "</table>";
+    doPrint(html);
+  });
+}
+
+// ============ ホーム（リマインダー・達成状況・検索） ============
+function renderHome() {
+  document.getElementById("homeOrgName").textContent = state.org.name;
+  document.getElementById("searchWord").value = "";
+  document.getElementById("searchResult").innerHTML = "";
+  Promise.all([dbGetAll("users"), dbGetAll("plans"), dbGetAll("monitors")]).then(function (r) {
+    var users = r[0], plans = r[1], mons = r[2];
+    var rem = document.getElementById("reminderList");
+    var html = "";
+    var orgPlans = plans.filter(function (p) { return p.orgId === state.org.id; });
+    orgPlans.forEach(function (p) {
+      var u = users.find(function (x) { return x.id === p.userId; });
+      if (!u || u.status === "closed") return;
+      var hasNewer = orgPlans.some(function (q) { return q.prevPlanId === p.id; });
+      var gap = daysDiff(todayStr(), p.endDate);
+      if (gap < -60 && !hasNewer) {
+        html += "<div class='alert-box'><strong>更新遅延</strong> " + esc(u.name) + " 第" + (p.version || 1) + "期の計画が " + fmtJP(p.endDate) + " に終了しています。更新計画を作成してください</div>";
+      } else if (gap <= 60 && gap >= 0 && !hasNewer) {
+        html += "<div class='warn-box'><strong>更新予定</strong> " + esc(u.name) + " 第" + (p.version || 1) + "期の計画が " + fmtJP(p.endDate) + " に終了します（あと" + gap + "日）。更新計画の準備をしてください</div>";
+      }
+      var ms = mons.filter(function (m) { return m.planId === p.id; });
+      ms.sort(function (a, b) { return (a.date || "").localeCompare(b.date || ""); });
+      var last = ms[ms.length - 1];
+      if (!last && daysDiff(p.startDate, todayStr()) > 180) {
+        html += "<div class='alert-box'><strong>モニタリング未実施</strong> " + esc(u.name) + " の第" + (p.version || 1) + "期計画でモニタリングが実施されていません（6か月超過）</div>";
+      } else if (last && daysDiff(last.date, todayStr()) > 180) {
+        html += "<div class='warn-box'><strong>モニタリング期限超過</strong> " + esc(u.name) + " の直近モニタリングは " + fmtJP(last.date) + "（" + daysDiff(last.date, todayStr()) + "日前）。6か月を超えています</div>";
+      }
+    });
+    if (!html) html = "<p class='hint'>現在、期限間近のタスクはありません。</p>";
+    rem.innerHTML = html;
+    renderAchieve(users, orgPlans, mons);
+  });
+}
+function renderAchieve(users, orgPlans, mons) {
+  var rows = "";
+  users.filter(function (u) { return u.status !== "closed"; }).sort(function (a, b) { return (a.name || "").localeCompare(b.name || "", "ja"); }).forEach(function (u) {
+    var up = orgPlans.filter(function (p) { return p.userId === u.id; });
+    if (!up.length) return;
+    var latest = null, latestDate = "";
+    up.forEach(function (p) {
+      var ms = mons.filter(function (m) { return m.planId === p.id; });
+      ms.forEach(function (m) {
+        if (!latestDate || (m.date || "") > latestDate) { latestDate = m.date || ""; latest = m; }
+      });
+    });
+    var counts = { "達成": 0, "ほぼ達成": 0, "未達成": 0 };
+    if (latest) (latest.items || []).forEach(function (it) { if (counts[it.eval] !== undefined) counts[it.eval]++; });
+    var total = counts["達成"] + counts["ほぼ達成"] + counts["未達成"];
+    var tag = !latest
+      ? "<span class='tag red'>未実施</span>"
+      : (total && counts["未達成"] === 0 ? "<span class='tag green'>順調</span>" : "<span class='tag orange'>要確認</span>");
+    rows += "<tr><td><strong>" + esc(u.name) + "</strong></td><td>" + (latest ? fmtJP(latest.date) : "—") + "</td>" +
+      "<td>" + counts["達成"] + "</td><td>" + counts["ほぼ達成"] + "</td><td>" + counts["未達成"] + "</td><td>" + tag + "</td></tr>";
+  });
+  document.getElementById("achieveTable").innerHTML = "<tr><th>利用者</th><th>直近モニタリング</th><th>達成</th><th>ほぼ達成</th><th>未達成</th><th>状況</th></tr>" + rows;
+}
+function renderSearch() {
+  var w = document.getElementById("searchWord").value.trim();
+  var box = document.getElementById("searchResult");
+  if (!w) { box.innerHTML = ""; return; }
+  var kw = w.toLowerCase();
+  Promise.all([dbGetAll("users"), dbGetAll("plans"), dbGetAll("monitors"), dbGetAll("meetings")]).then(function (r) {
+    var users = r[0], plans = r[1], mons = r[2], mtgs = r[3];
+    var hits = [];
+    function hitStr() { return Array.prototype.join.call(arguments, " ").toLowerCase(); }
+    users.forEach(function (u) {
+      if (hitStr(u.name, u.face && u.face.disability).indexOf(kw) >= 0) {
+        hits.push({ user: u, label: "利用者: " + u.name });
+      }
+    });
+    plans.filter(function (p) { return p.orgId === state.org.id; }).forEach(function (p) {
+      var u = users.find(function (x) { return x.id === p.userId; });
+      if (!u) return;
+      var all = hitStr(p.policy, p.longGoal, p.shortGoal, (p.items || []).map(function (i) { return i.need + i.goal + i.support; }).join(" "));
+      if (all.indexOf(kw) >= 0) hits.push({ user: u, label: "計画: " + u.name + " 第" + (p.version || 1) + "期" });
+    });
+    mons.filter(function (m) { return m.orgId === state.org.id; }).forEach(function (m) {
+      var u = users.find(function (x) { return x.id === m.userId; });
+      if (!u) return;
+      if (hitStr(m.reason, (m.items || []).map(function (i) { return i.goal + i.analysis + i.action; }).join(" ")).indexOf(kw) >= 0) {
+        hits.push({ user: u, label: "モニタリング: " + u.name + " " + fmtJP(m.date) });
+      }
+    });
+    mtgs.filter(function (m) { return m.orgId === state.org.id; }).forEach(function (m) {
+      var u = users.find(function (x) { return x.id === m.userId; });
+      if (!u) return;
+      if (hitStr(m.agenda, m.content, m.decision).indexOf(kw) >= 0) {
+        hits.push({ user: u, label: "会議録: " + u.name + " " + fmtJP(m.date) });
+      }
+    });
+    if (!hits.length) { box.innerHTML = '<p class="hint">該当なし</p>'; return; }
+    box.innerHTML = hits.slice(0, 15).map(function (h) {
+      return '<div class="row" style="margin-top:6px"><button class="btn sec small" onclick="openUser(\'' + h.user.id + '\')">開く</button><span>' + esc(h.label) + "</span></div>";
+    }).join("");
+  });
+}
+
+// ============ 年間計画表 ============
+function renderCalendar() {
+  var y = +document.getElementById("calYear").value || new Date().getFullYear();
+  document.getElementById("calYear").value = y;
+  Promise.all([dbGetAll("users"), dbGetAll("plans"), dbGetAll("monitors")]).then(function (r) {
+    var users = r[0], plans = r[1], mons = r[2];
+    var orgPlans = plans.filter(function (p) { return p.orgId === state.org.id; });
+    var monthKey = function (dstr) { return dstr ? dstr.slice(0, 7) : ""; };
+    var t = document.getElementById("calTable");
+    var html = "<tr><th>利用者</th>";
+    for (var m = 1; m <= 12; m++) html += "<th>" + m + "月</th>";
+    html += "</tr>";
+    users.filter(function (u) { return u.status !== "closed"; }).sort(function (a, b) { return (a.name || "").localeCompare(b.name || "", "ja"); }).forEach(function (u) {
+      var up = orgPlans.filter(function (p) { return p.userId === u.id; });
+      if (!up.length) return;
+      html += "<tr><td><strong>" + esc(u.name) + "</strong></td>";
+      for (var m = 1; m <= 12; m++) {
+        var key = y + "-" + pad(m);
+        var cell = [];
+        up.forEach(function (p) {
+          if (monthKey(p.startDate) === key) cell.push("<span class='tag blue'>開始</span>");
+          if (monthKey(p.endDate) === key) cell.push("<span class='tag orange'>▲更新</span>");
+        });
+        var ms = mons.filter(function (mo) { return mo.userId === u.id && mo.orgId === state.org.id && monthKey(mo.date) === key; });
+        if (ms.length) cell.push("<span class='tag green'>モ×" + ms.length + "</span>");
+        html += "<td style='text-align:center'>" + cell.join(" ") + "</td>";
+      }
+      html += "</tr>";
+    });
+    t.innerHTML = html;
+  });
+}
+
+// ============ データ管理 ============
+function renderDataScreen() {
+  if (navigator.storage && navigator.storage.estimate) {
+    navigator.storage.estimate().then(function (e) {
+      var mb = function (b) { return (b / 1048576).toFixed(2); };
+      document.getElementById("storageInfo").textContent = "データ使用量: " + mb(e.usage) + "MB ／ 利用可能: " + mb(e.quota) + "MB";
+    });
+  }
+  dbGetAll("users").then(function (users) {
+    var sel = document.getElementById("wordUserSel");
+    sel.innerHTML = '<option value="">利用者を選択</option>' + users.filter(function (u) { return u.status !== "closed"; }).map(function (u) {
+      return "<option value='" + u.id + "'>" + esc(u.name) + "</option>";
+    }).join("");
+  });
+  document.getElementById("wordPlanSel").innerHTML = '<option value="">計画を選択</option>';
+}
+function wordUserChanged() {
+  var uidV = document.getElementById("wordUserSel").value;
+  var sel = document.getElementById("wordPlanSel");
+  sel.innerHTML = '<option value="">計画を選択</option>';
+  if (!uidV) return;
+  dbGetAll("plans").then(function (plans) {
+    var opts = plans.filter(function (p) { return p.userId === uidV && p.orgId === state.org.id; });
+    opts.sort(function (a, b) { return (b.version || 1) - (a.version || 1); });
+    opts.forEach(function (p) {
+      sel.innerHTML += "<option value='" + p.id + "'>第" + (p.version || 1) + "期 " + fmtJP(p.startDate) + "〜" + fmtJP(p.endDate) + "</option>";
+    });
+  });
+}
+function exportWord() {
+  var uidV = document.getElementById("wordUserSel").value;
+  var pid = document.getElementById("wordPlanSel").value;
+  if (!uidV || !pid) { alert("利用者と計画を選択してください"); return; }
+  dbGetAll("users").then(function (users) {
+    dbGetAll("plans").then(function (plans) {
+      var u = users.find(function (x) { return x.id === uidV; });
+      var p = plans.find(function (x) { return x.id === pid; });
+      if (!u || !p) return;
+      var draftMark = p.status === "draft" ? "<p style='text-align:center;color:#b3261e;font-weight:bold'>（案）</p>" : "";
+      var rows = (p.items || []).map(function (it) {
+        return "<tr><td style='text-align:center'>" + esc(it.priority) + "</td><td>" + esc(it.need) + "</td><td>" + esc(it.goal) + "</td><td>" + esc(it.support) + "</td><td>" + esc(it.period) + "</td><td>" + esc(it.provider) + "</td></tr>";
+      }).join("");
+      var body =
+        '<h2 style="text-align:center">個別支援計画</h2>' + draftMark +
+        '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">' +
+        "<tr><td><b>利用者氏名</b></td><td>" + esc(u.name) + "</td><td><b>個別支援計画 作成年月日</b></td><td>" + fmtJPy(p.createdDate) + "</td></tr>" +
+        "<tr><td><b>支援提供期間</b></td><td colspan='3'>" + fmtJPy(p.startDate) + " から " + fmtJPy(p.endDate) + " まで</td></tr></table>" +
+        '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%"><tr><td><b>総合的な援助の方針</b></td></tr><tr><td>' + esc(p.policy) + "</td></tr></table>" +
+        '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">' +
+        "<tr><td rowspan='2'><b>到達目標</b></td><td><b>長期目標</b></td><td>" + esc(p.longGoal) + "</td></tr>" +
+        "<tr><td><b>短期目標</b></td><td>" + esc(p.shortGoal) + "</td></tr></table>" +
+        '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">' +
+        "<tr><th>優先順位</th><th>ニーズ・課題</th><th>具体的な到達目標</th><th>支援内容</th><th>支援期間</th><th>サービス提供機関</th></tr>" + rows + "</table>" +
+        '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">' +
+        "<tr><td><b>事業所名</b></td><td>" + esc(p.orgName) + "</td></tr>" +
+        "<tr><td><b>" + fmtJPy(p.confirmedDate || "") + "</b></td><td>利用者氏名 " + esc(u.name) + "</td><td><b>サービス管理責任者</b></td><td>" + esc(p.manager) + "</td></tr></table>";
+      var doc =
+        "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'>" +
+        "<head><meta charset='utf-8'><title>個別支援計画</title></head><body>" + body + "</body></html>";
+      download("個別支援計画_" + u.name + "_第" + (p.version || 1) + "期.doc", doc, "application/msword");
+    });
+  });
+}
+function exportCSV(kind) {
+  Promise.all([dbGetAll("users"), dbGetAll("plans"), dbGetAll("monitors"), dbGetAll("meetings")]).then(function (r) {
+    var users = r[0], plans = r[1], mons = r[2], mtgs = r[3];
+    var lines = [];
+    function c(v) { v = String(v == null ? "" : v); return '"' + v.replace(/"/g, '""') + '"'; }
+    if (kind === "monitors") {
+      lines.push("事業所,利用者,実施日,計画第期,優先順位,具体的な到達目標,評価,支援内容と課題分析,今後の対応,一般就労の可能性,他サービス移行の可能性,他事業所利用の可能性,更新の必要性,判断の理由");
+      mons.filter(function (m) { return m.orgId === state.org.id; }).forEach(function (m) {
+        var u = users.find(function (x) { return x.id === m.userId; });
+        var p = plans.find(function (x) { return x.id === m.planId; });
+        (m.items || []).forEach(function (it, i) {
+          if (!i) lines.push([m.orgName, u ? u.name : "", m.date, p ? p.version : "", it.priority, it.goal, it.eval, it.analysis, it.action, m.job, m.transfer, m.otherOrg, m.updateNeeded, m.reason].map(c).join(","));
+          else lines.push([m.orgName, u ? u.name : "", m.date, p ? p.version : "", it.priority, it.goal, it.eval, it.analysis, it.action, "", "", "", "", ""].map(c).join(","));
+        });
+      });
+      download("モニタリング一覧.csv", "\ufeff" + lines.join("\r\n"), "text/csv;charset=utf-8");
+    } else if (kind === "plans") {
+      lines.push("事業所,利用者,版,状態,作成年月日,開始日,終了日,長期目標,短期目標,方針");
+      plans.filter(function (p) { return p.orgId === state.org.id; }).forEach(function (p) {
+        var u = users.find(function (x) { return x.id === p.userId; });
+        lines.push([p.orgName, u ? u.name : "", p.version, p.status, p.createdDate, p.startDate, p.endDate, p.longGoal, p.shortGoal, p.policy].map(c).join(","));
+      });
+      download("個別支援計画一覧.csv", "\ufeff" + lines.join("\r\n"), "text/csv;charset=utf-8");
+    } else if (kind === "users") {
+      lines.push("氏名,ステータス,生年月日,年齢,障害または疾患名,障害程度区分,性別,住所,電話番号");
+      users.forEach(function (u) {
+        var f = u.face || {};
+        lines.push([u.name, u.status, f.birthday, f.birthday ? calcAge(f.birthday) : "", f.disability, f.grade, f.gender, f.address, f.phone].map(c).join(","));
+      });
+      download("利用者一覧.csv", "\ufeff" + lines.join("\r\n"), "text/csv;charset=utf-8");
+    }
+  });
+}
+function exportBackup() {
+  Promise.all(STORES.map(function (s) { return dbGetAll(s); })).then(function (all) {
+    var data = { app: "kobetsu-plan-backup", exported: new Date().toISOString() };
+    STORES.forEach(function (s, i) { data[s] = all[i]; });
+    download("プラン管理バックアップ_" + todayStr() + ".json", JSON.stringify(data, null, 2), "application/json");
+    alert("バックアップを書き出しました");
+  });
+}
+function importBackup() {
+  var fileEl = document.getElementById("backupFile");
+  if (!fileEl.files || !fileEl.files[0]) { alert("バックアップファイルを選択してください"); return; }
+  if (!confirm("取り込むと、この端末の現在のデータはすべて置き換わります。よろしいですか？")) return;
+  var reader = new FileReader();
+  reader.onload = function () {
+    try {
+      var data = JSON.parse(reader.result);
+      if (data.app !== "kobetsu-plan-backup") { alert("このアプリのバックアップファイルではありません"); return; }
+      var tx = DB.transaction(STORES, "readwrite");
+      STORES.forEach(function (s) {
+        var st = tx.objectStore(s);
+        st.clear();
+        (data[s] || []).forEach(function (o) { st.put(o); });
+      });
+      tx.oncomplete = function () {
+        alert("バックアップを取り込みました");
+        toOrgSelect();
+      };
+      tx.onerror = function () { alert("取り込みに失敗しました"); };
+    } catch (e) { alert("ファイルを読み込めませんでした（形式が正しくありません）"); }
+  };
+  reader.readAsText(fileEl.files[0]);
+}
+
+// ============ 初期化 ============
+document.getElementById("wordUserSel").addEventListener("change", wordUserChanged);
+
+openDB().then(function () {
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist().then(function (granted) {
+      document.getElementById("persistInfo").textContent = granted
+        ? "永続ストレージ: 有効（ブラウザによる自動削除の対象外）"
+        : "永続ストレージ: 未許可（ブラウザ設定により削除される可能性があります）";
+    });
+  }
+  renderOrgSelect();
+  showScreen("screen-org-select");
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
+}).catch(function (e) { alert("データベースを開けませんでした: " + e); });
+</script>
+</body>
+</html>
