@@ -241,6 +241,7 @@ textarea.ed-cell { resize: vertical; min-height: 1.6em; line-height: 1.4; }
   </div>
 </div>
   <div class="tabpanel" id="panel-monitors">
+  <div class="row" style="margin-bottom:10px"><button class="btn" onclick="newMonitorFromList()">＋ 新規モニタリング</button></div>
   <div id="monitorList"></div>
   <div class="card">
     <div class="row" style="justify-content:space-between">
@@ -1006,7 +1007,7 @@ function collectPlanItems() {
 }
 function savePlan() {
   var p = state.plan || {
-    id: uid(), orgId: state.org.id, userId: state.user.id, status: "draft",
+    id: uid(), orgId: state.org ? state.org.id : null, userId: state.user.id, status: "draft",
     version: 1, createdAt: Date.now()
   };
   p.createdDate = document.getElementById("planCreated").value;
@@ -1021,6 +1022,7 @@ function savePlan() {
   dbPut("plans", p).then(function () {
     state.plan = null;
     renderUserDetail();
+    userTab("plans");
     showScreen("screen-user");
   });
 }
@@ -1071,6 +1073,14 @@ function delPlan(id) {
 }
 
 // ============ モニタリング ============
+function newMonitorFromList() {
+  dbGetAll("plans").then(function (plans) {
+    var orgId = state.org ? state.org.id : null;
+    var has = plans.some(function (p) { return p.userId === state.user.id && (orgId === null || p.orgId === orgId); });
+    if (!has) { alert("個別支援計画がありません。先に「個別支援計画」タブから計画を作成・取り込みしてください。"); return; }
+    openMonitorForm();
+  });
+}
 function renderMonitorList() {
   var box = document.getElementById("monitorList");
   box.innerHTML = "";
@@ -1079,7 +1089,7 @@ function renderMonitorList() {
       var orgId = state.org ? state.org.id : null;
       var list = mons.filter(function (m) { return m.userId === state.user.id && (orgId === null || m.orgId === orgId); });
       list.sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
-      if (!list.length) { box.innerHTML = '<p class="hint">まだモニタリング記録がありません。計画から「モニタリング作成」してください。</p>'; return; }
+      if (!list.length) { box.innerHTML = '<p class="hint">まだモニタリング記録がありません。「＋ 新規モニタリング」または計画カードの「モニタリング作成」から作成してください。</p>'; return; }
       list.forEach(function (m) {
         var p = plans.find(function (x) { return x.id === m.planId; });
         var d = document.createElement("div");
@@ -1113,7 +1123,8 @@ function openMonitorForm(planId) {
   fillOrgRefs();
   dbGetAll("plans").then(function (plans) {
     var sel = document.getElementById("monitorPlanSel");
-    var opts = plans.filter(function (p) { return p.userId === state.user.id && p.orgId === state.org.id; });
+    var orgId = state.org ? state.org.id : null;
+    var opts = plans.filter(function (p) { return p.userId === state.user.id && (orgId === null || p.orgId === orgId); });
     opts.sort(function (a, b) { return (b.version || 1) - (a.version || 1); });
     sel.innerHTML = opts.map(function (p) {
       return "<option value='" + p.id + "'>第" + (p.version || 1) + "期 " + fmtJP(p.startDate) + "〜" + fmtJP(p.endDate) + (p.status === "confirmed" ? "（確定）" : "（案）") + "</option>";
@@ -1148,13 +1159,14 @@ function monitorPlanChanged() {
 }
 function addMonitorItem(it) {
   it = it || {};
+  var nm = "evalrow" + uid();
   var tr = document.createElement("tr");
   tr.innerHTML =
     '<td><input value="' + esc(it.priority || "") + '"></td>' +
     '<td><textarea style="min-height:44px">' + esc(it.goal || "") + "</textarea></td>" +
     '<td><div class="row" style="gap:4px">' +
     ["達成", "ほぼ達成", "未達成"].map(function (v) {
-      return "<label style='display:inline-flex;align-items:center;gap:3px;margin:0;font-size:12px'><input type='radio' name='evalrow' value='" + v + "' " + (it.eval === v ? "checked" : "") + ">" + v + "</label>";
+      return "<label style='display:inline-flex;align-items:center;gap:3px;margin:0;font-size:12px'><input type='radio' name='" + nm + "' value='" + v + "' " + (it.eval === v ? "checked" : "") + ">" + v + "</label>";
     }).join("") + "</div></td>" +
     '<td><textarea style="min-height:44px">' + esc(it.analysis || "") + "</textarea></td>" +
     '<td><textarea style="min-height:44px">' + esc(it.action || "") + "</textarea></td>" +
@@ -1188,7 +1200,7 @@ function saveMonitor() {
   if (!pid) { alert("対象の計画を選択してください"); return; }
   dbGetAll("plans").then(function (plans) {
     var p = plans.find(function (x) { return x.id === pid; });
-    var m = state.monitor || { id: uid(), orgId: state.org.id, userId: state.user.id, planId: pid, createdAt: Date.now() };
+    var m = state.monitor || { id: uid(), orgId: state.org ? state.org.id : null, userId: state.user.id, planId: pid, createdAt: Date.now() };
     m.planId = pid;
     m.date = document.getElementById("monitorDate").value;
     m.orgName = document.getElementById("monitorOrgName").value;
@@ -1207,6 +1219,7 @@ function saveMonitor() {
     dbPut("monitors", m).then(function () {
       state.monitor = null;
       renderUserDetail();
+      userTab("monitors");
       showScreen("screen-user");
     });
   });
@@ -1229,7 +1242,8 @@ function editMonitor(id) {
     document.getElementById("monReason").value = m.reason || "";
     dbGetAll("plans").then(function (plans) {
       var sel = document.getElementById("monitorPlanSel");
-      var opts = plans.filter(function (p) { return p.userId === state.user.id && p.orgId === state.org.id; });
+      var orgId = state.org ? state.org.id : null;
+      var opts = plans.filter(function (p) { return p.userId === state.user.id && (orgId === null || p.orgId === orgId); });
       opts.sort(function (a, b) { return (b.version || 1) - (a.version || 1); });
       sel.innerHTML = opts.map(function (p) {
         return "<option value='" + p.id + "'>第" + (p.version || 1) + "期 " + fmtJP(p.startDate) + "〜" + fmtJP(p.endDate) + "</option>";
@@ -1303,7 +1317,8 @@ function openMeetingForm() {
 function fillMtgPlanSel(selVal) {
   var sel = document.getElementById("mtgPlanSel");
   dbGetAll("plans").then(function (plans) {
-    var opts = plans.filter(function (p) { return p.userId === state.user.id && p.orgId === state.org.id; });
+    var orgId = state.org ? state.org.id : null;
+    var opts = plans.filter(function (p) { return p.userId === state.user.id && (orgId === null || p.orgId === orgId); });
     opts.sort(function (a, b) { return (b.version || 1) - (a.version || 1); });
     sel.innerHTML = "<option value=''>（紐付けなし）</option>" + opts.map(function (p) {
       return "<option value='" + p.id + "' " + (selVal === p.id ? "selected" : "") + ">第" + (p.version || 1) + "期 " + fmtJP(p.startDate) + "〜" + fmtJP(p.endDate) + "</option>";
@@ -1331,7 +1346,7 @@ function collectParticipants() {
   return list;
 }
 function saveMeeting() {
-  var m = state.meeting || { id: uid(), orgId: state.org.id, userId: state.user.id, createdAt: Date.now() };
+  var m = state.meeting || { id: uid(), orgId: state.org ? state.org.id : null, userId: state.user.id, createdAt: Date.now() };
   m.date = document.getElementById("mtgDate").value;
   m.time = document.getElementById("mtgTime").value;
   m.place = document.getElementById("mtgPlace").value;
@@ -1345,6 +1360,7 @@ function saveMeeting() {
   dbPut("meetings", m).then(function () {
     state.meeting = null;
     renderUserDetail();
+    userTab("meetings");
     showScreen("screen-user");
   });
 }
