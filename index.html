@@ -17,6 +17,11 @@ label { font-size: 12px; color: #5b6b7c; display: block; margin: 8px 0 3px; }
 .screen { display: none; padding: 14px 14px 78px; max-width: 980px; margin: 0 auto; }
 .screen.active { display: block; }
 #screen-org-select.active { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; text-align: center; padding: 20px; }
+#screen-lock { position: fixed; inset: 0; z-index: 200; background: #f3f5f9; display: flex; align-items: center; justify-content: center; padding: 20px; }
+#screen-lock.hidden { display: none; }
+.lock-box { width: 100%; max-width: 440px; background: #fff; border: 1px solid #e3e8f0; border-radius: 14px; padding: 22px; }
+.lock-box h1 { margin-bottom: 8px; }
+.lock-box label { margin-top: 12px; }
 nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #dde3ec; display: flex; z-index: 50; }
 nav button { flex: 1; border: none; background: none; padding: 10px 2px 12px; font-size: 12px; color: #5b6b7c; }
 nav button.active { color: #2f6fed; font-weight: 700; }
@@ -56,7 +61,8 @@ table.list th { background: #eef2f8; font-size: 12px; }
   body > .screen, nav { display: none !important; }
   #print-area { display: block !important; }
   body { background: #fff; }
-  @page { size: A4; margin: 10mm 12mm; }
+  @page { size: A4; margin: 0; }
+  #print-area { padding: 10mm 12mm; }
 }
 .pf { width: 100%; border-collapse: collapse; font-size: 10.5pt; margin-bottom: 6px; page-break-inside: auto; }
 .pf th, .pf td { border: 1px solid #333; padding: 4px 6px; vertical-align: top; }
@@ -69,11 +75,39 @@ table.list th { background: #eef2f8; font-size: 12px; }
 .p-org { text-align: left; font-size: 10pt; margin-bottom: 8px; }
 .ptext { white-space: pre-wrap; word-break: break-all; }
 .pblank { height: 34px; }
+.ed-cell { width: 100%; border: 1px solid transparent; background: transparent; font: inherit; color: inherit; padding: 2px 4px; border-radius: 3px; box-sizing: border-box; }
+.ed-cell:hover { border-color: #cfd8e3; }
+.ed-cell:focus { outline: none; border-color: #4a90d9; background: #fff; }
+textarea.ed-cell { resize: vertical; min-height: 1.6em; line-height: 1.4; }
+.epid-toolbar { position: sticky; top: 0; background: #fff; padding: 8px 0; z-index: 5; border-bottom: 1px solid #eee; margin-bottom: 8px; }
+.ed-add { margin: 6px 0; }
 </style>
 </head>
 <body>
 
 <div id="print-area"></div>
+
+<div id="screen-lock">
+  <div class="lock-box">
+    <h1 style="font-size:22px">個別支援プラン管理</h1>
+    <div id="lock-setup">
+      <p class="sub">初回セットアップ：データを暗号化するパスフレーズを設定します</p>
+      <label>パスフレーズ（4文字以上・紛失すると復元不可能）</label>
+      <input id="lockPass1" type="password" placeholder="例: ご自身だけの文字列">
+      <label>パスフレーズ（確認）</label>
+      <input id="lockPass2" type="password" placeholder="もう一度入力">
+      <button class="btn" style="width:100%;margin-top:12px" onclick="doSetup()">設定して開始</button>
+    </div>
+    <div id="lock-unlock" style="display:none">
+      <p class="sub">データは暗号化されています。パスフレーズを入力して解除してください</p>
+      <label>パスフレーズ</label>
+      <input id="lockPass" type="password" placeholder="パスフレーズ" onkeydown="if(event.key==='Enter')doUnlock()">
+      <button class="btn" style="width:100%;margin-top:12px" onclick="doUnlock()">解除</button>
+      <button class="btn warn" style="width:100%;margin-top:8px" onclick="resetAll()">すべて初期化（データ消去）</button>
+    </div>
+    <p id="lockErr" class="hint" style="color:#b3261e;min-height:16px"></p>
+  </div>
+</div>
 
 <section class="screen" id="screen-org-select">
   <div style="width:100%;max-width:460px">
@@ -88,7 +122,7 @@ table.list th { background: #eef2f8; font-size: 12px; }
   <div class="topbar">
     <div>
       <h1 id="homeOrgName">—</h1>
-      <p class="sub" style="margin-bottom:0">ホーム（ダッシュボード）</p>
+      <p class="sub" style="margin-bottom:0">ホーム（ダッシュボード） <span id="buildTag" style="font-weight:700;color:#B3261E">build v11</span></p>
     </div>
     <button class="btn sec small" onclick="toOrgSelect()">事業所を変更</button>
   </div>
@@ -158,28 +192,97 @@ table.list th { background: #eef2f8; font-size: 12px; }
       <div class="row" style="justify-content:space-between">
         <span style="font-weight:700">フェイスシート（基本情報）</span>
         <div class="row">
-          <button class="btn sec small" onclick="editFace()">入力・編集</button>
+          <button class="btn sec small" onclick="renderFaceEdit()">入力・編集</button>
           <button class="btn small" onclick="printFace()">印刷</button>
+          <button class="btn sec small" onclick="exportFaceDocx()">Word出力</button>
         </div>
       </div>
       <div id="faceSummary" class="hint" style="margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <span style="font-weight:700">JSONで取り込み（AI抽出データ等）</span>
+        <button class="btn sec small" onclick="exportFaceJson()">JSON出力</button>
+        <button class="btn sec small" onclick="downloadFaceJson()">保存</button>
+        <button class="btn sec small" onclick="toggleBox('faceImportBox')">開く／閉じる</button>
+      </div>
+      <div id="faceImportBox" style="display:none;margin-top:8px">
+        <label>フェイスシートJSON（例: {"name":"THメガネ","face":{"birthday":"2008-03-14",...}}）</label>
+        <div style="margin:6px 0"><input type="file" accept=".json,application/json" onchange="loadImportFile('faceJson',this)"><span class="hint"> ファイルを選ぶとここに読み込まれます（1件分のJSON。全体のバックアップ復元は「データ」画面の「取り込み」へ）</span></div>
+        <textarea id="faceJson" style="min-height:120px"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button class="btn small" onclick="importFaceJson()">取り込む</button>
+          <span id="faceImportMsg" class="hint"></span>
+        </div>
+      </div>
     </div>
   </div>
   <div class="tabpanel" id="panel-plans">
     <div class="row" style="margin-bottom:10px">
       <button class="btn" onclick="openPlanForm()">＋ 新規計画（案）</button>
     </div>
-    <div id="planList"></div>
+  <div id="planList"></div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <span style="font-weight:700">JSONで計画を取り込み（AI作成データ等）</span>
+      <button class="btn sec small" onclick="exportPlanJson()">JSON出力</button>
+      <button class="btn sec small" onclick="downloadPlanJson()">保存</button>
+      <button class="btn sec small" onclick="toggleBox('planImportBox')">開く／閉じる</button>
+    </div>
+    <div id="planImportBox" style="display:none;margin-top:8px">
+        <label>計画JSON（例: {"createdDate":"2026-08-22","startDate":"2026-08-22","endDate":"2027-02-21","policy":"...","longGoal":"...","shortGoal":"...","items":[{"priority":1,"need":"...","goal":"...","support":"...","period":"","provider":""}]}）</label>
+        <div style="margin:6px 0"><input type="file" accept=".json,application/json" onchange="loadImportFile('planJson',this)"><span class="hint"> ファイルを選ぶとここに読み込まれます（1件分のJSON。全体のバックアップ復元は「データ」画面の「取り込み」へ）</span></div>
+        <textarea id="planJson" style="min-height:120px"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn small" onclick="importPlanJson()">取り込む</button>
+        <span id="planImportMsg" class="hint"></span>
+      </div>
+    </div>
   </div>
+</div>
   <div class="tabpanel" id="panel-monitors">
-    <div id="monitorList"></div>
+  <div id="monitorList"></div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+        <span style="font-weight:700">JSONでモニタリングを取り込み（AI作成データ等）</span>
+        <button class="btn sec small" onclick="exportMonitorJson()">JSON出力</button>
+        <button class="btn sec small" onclick="downloadMonitorJson()">保存</button>
+        <button class="btn sec small" onclick="toggleBox('monitorImportBox')">開く／閉じる</button>
+    </div>
+    <div id="monitorImportBox" style="display:none;margin-top:8px">
+        <label>モニタリングJSON（例: {"date":"2026-08-22","job":"なし","transfer":"なし","otherOrg":"なし","updateNeeded":"なし","reason":"","items":[{"priority":1,"goal":"...","eval":"達成","analysis":"...","action":"..."}]}）</label>
+        <div style="margin:6px 0"><input type="file" accept=".json,application/json" onchange="loadImportFile('monitorJson',this)"><span class="hint"> ファイルを選ぶとここに読み込まれます（1件分のJSON。全体のバックアップ復元は「データ」画面の「取り込み」へ）</span></div>
+        <textarea id="monitorJson" style="min-height:120px"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn small" onclick="importMonitorJson()">取り込む</button>
+        <span id="monitorImportMsg" class="hint"></span>
+      </div>
+    </div>
   </div>
+</div>
   <div class="tabpanel" id="panel-meetings">
     <div class="row" style="margin-bottom:10px">
       <button class="btn" onclick="openMeetingForm()">＋ 会議録を追加</button>
     </div>
-    <div id="meetingList"></div>
+  <div id="meetingList"></div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <span style="font-weight:700">JSONで会議録を取り込み（AI作成データ等）</span>
+      <button class="btn sec small" onclick="exportMeetingJson()">JSON出力</button>
+      <button class="btn sec small" onclick="downloadMeetingJson()">保存</button>
+      <button class="btn sec small" onclick="toggleBox('meetingImportBox')">開く／閉じる</button>
+    </div>
+    <div id="meetingImportBox" style="display:none;margin-top:8px">
+        <label>会議録JSON（例: {"date":"2026-08-22","time":"14:00","place":"事業所","agenda":"...","content":"...","decision":"...","nextDate":"","participants":[{"name":"...","role":"..."}]}）</label>
+        <div style="margin:6px 0"><input type="file" accept=".json,application/json" onchange="loadImportFile('meetingJson',this)"><span class="hint"> ファイルを選ぶとここに読み込まれます（1件分のJSON。全体のバックアップ復元は「データ」画面の「取り込み」へ）</span></div>
+        <textarea id="meetingJson" style="min-height:120px"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn small" onclick="importMeetingJson()">取り込む</button>
+        <span id="meetingImportMsg" class="hint"></span>
+      </div>
+    </div>
   </div>
+</div>
 </section>
 
 <section class="screen" id="screen-plan-form">
@@ -304,6 +407,19 @@ table.list th { background: #eef2f8; font-size: 12px; }
   </div>
 </section>
 
+<section class="screen" id="screen-face-edit">
+  <div id="faceEditBody"></div>
+</section>
+<section class="screen" id="screen-plan-edit">
+  <div id="planEditBody"></div>
+</section>
+<section class="screen" id="screen-monitor-edit">
+  <div id="monitorEditBody"></div>
+</section>
+<section class="screen" id="screen-meeting-edit">
+  <div id="meetingEditBody"></div>
+</section>
+
 <section class="screen" id="screen-calendar">
   <div class="topbar">
     <h1>年間計画表</h1>
@@ -335,7 +451,7 @@ table.list th { background: #eef2f8; font-size: 12px; }
       <select id="wordPlanSel" style="max-width:260px"></select>
       <button class="btn sec small" onclick="exportWord()">計画書をWordで出力</button>
     </div>
-    <p class="hint">個別支援計画書をWordで開ける形式（.doc）で書き出します</p>
+    <p class="hint">個別支援計画書をWordで開ける形式（.docx）で書き出します</p>
   </div>
   <div class="card">
     <h2>バックアップ</h2>
@@ -365,7 +481,52 @@ table.list th { background: #eef2f8; font-size: 12px; }
 
 // ============ 共通ヘルパー ============
 var DB_NAME = "kobetsu-plan-db", DB_VER = 1, DB = null;
-var STORES = ["orgs", "users", "plans", "monitors", "meetings"];
+var STORES = ["orgs", "users", "plans", "monitors", "meetings", "meta"];
+
+// ============ 暗号化（パスフレーズ方式：PBKDF2 -> AES-GCM） ============
+var SESSION_KEY = null;       // 解除中の AES-GCM CryptoKey（メモリのみ）
+var SESSION_PASS = "";        // 解除中のパスフレーズ（メモリのみ・インポート再派生用）
+var ENC_SALT = null;          // 派生用ソルト（Uint8Array）
+var VERIFIER = null;          // {iv, ct}：パスフレーズ照合用
+var PBKDF2_ITER = 150000;
+var VERIFY_TEXT = "kobetsu-verify-token";
+
+function bufToB64(buf) {
+  var ba = new Uint8Array(buf), s = "";
+  for (var i = 0; i < ba.length; i++) s += String.fromCharCode(ba[i]);
+  return btoa(s);
+}
+function b64ToBuf(b64) {
+  var s = atob(b64), buf = new Uint8Array(s.length);
+  for (var i = 0; i < s.length; i++) buf[i] = s.charCodeAt(i);
+  return buf;
+}
+function strToBuf(str) { return new TextEncoder().encode(str); }
+function bufToStr(buf) { return new TextDecoder().decode(buf); }
+
+function deriveKey(pass, salt) {
+  return crypto.subtle.importKey("raw", strToBuf(pass), "PBKDF2", false, ["deriveKey"]).then(function (baseKey) {
+    return crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt: salt, iterations: PBKDF2_ITER, hash: "SHA-256" },
+      baseKey,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  });
+}
+function encryptObj(obj) {
+  var iv = crypto.getRandomValues(new Uint8Array(12));
+  return crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, SESSION_KEY, strToBuf(JSON.stringify(obj))).then(function (ct) {
+    return { id: obj.id, iv: bufToB64(iv), ct: bufToB64(ct) };
+  });
+}
+function decryptRec(rec) {
+  if (!rec || rec.ct == null) return Promise.resolve(rec); // 暗号化前のレガシー平文
+  return crypto.subtle.decrypt({ name: "AES-GCM", iv: b64ToBuf(rec.iv) }, SESSION_KEY, b64ToBuf(rec.ct)).then(function (pt) {
+    return JSON.parse(bufToStr(pt));
+  }).catch(function () { return null; }); // 鍵違い・破損
+}
 
 function esc(s) {
   return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -429,19 +590,29 @@ function openDB() {
     req.onerror = function () { rej(req.error); };
   });
 }
-function dbGetAll(store) {
+function rawGetAll(store) {
   return new Promise(function (res, rej) {
     var r = DB.transaction(store, "readonly").objectStore(store).getAll();
     r.onsuccess = function () { res(r.result); };
     r.onerror = function () { rej(r.error); };
   });
 }
-function dbPut(store, obj) {
+function rawPut(store, obj) {
   return new Promise(function (res, rej) {
     var r = DB.transaction(store, "readwrite").objectStore(store).put(obj);
     r.onsuccess = function () { res(); };
     r.onerror = function () { rej(r.error); };
   });
+}
+function dbGetAll(store) {
+  return rawGetAll(store).then(function (recs) {
+    return Promise.all(recs.map(decryptRec)).then(function (objs) {
+      return objs.filter(function (o) { return o != null; });
+    });
+  });
+}
+function dbPut(store, obj) {
+  return encryptObj(obj).then(function (w) { return rawPut(store, w); });
 }
 function dbDel(store, id) {
   return new Promise(function (res, rej) {
@@ -732,7 +903,8 @@ function renderPlanList() {
   var box = document.getElementById("planList");
   box.innerHTML = "";
   dbGetAll("plans").then(function (plans) {
-    var list = plans.filter(function (p) { return p.userId === state.user.id && p.orgId === state.org.id; });
+    var orgId = state.org ? state.org.id : null;
+    var list = plans.filter(function (p) { return p.userId === state.user.id && (orgId === null || p.orgId === orgId); });
     list.sort(function (a, b) { return (b.version || 1) - (a.version || 1); });
     if (!list.length) { box.innerHTML = '<p class="hint">まだ計画がありません。「新規計画（案）」から作成してください。</p>'; return; }
     list.forEach(function (p) {
@@ -746,9 +918,13 @@ function renderPlanList() {
         "<div><strong>第" + (p.version || 1) + "期</strong> " + tag + " <span class='hint'>" + fmtJP(p.startDate) + "〜" + fmtJP(p.endDate) + "</span></div>" +
         "<div class='row'>" +
         "<button class='btn sec small' onclick='printPlan(\"" + p.id + "\")'>印刷</button>" +
-        "<button class='btn sec small' onclick='editPlan(\"" + p.id + "\")'>編集</button>" +
+        "<button class='btn sec small' onclick='exportPlanDocx(\"" + p.id + "\")'>Word出力</button>" +
+        "<button class='btn sec small' onclick='renderPlanEdit(\"" + p.id + "\")'>編集</button>" +
         "<button class='btn sec small' onclick='openMonitorForm(\"" + p.id + "\")'>モニタリング作成</button>" +
         "<button class='btn sec small' onclick='openMeetingForm(\"" + p.id + "\")'>会議録</button>" +
+        "<button class='btn sec small' onclick='exportPlanJson(\"" + p.id + "\")'>JSON出力</button>" +
+        "<button class='btn sec small' onclick='downloadPlanJson(\"" + p.id + "\")'>保存</button>" +
+        "<button class='btn sec small' onclick='toggleBox(\"planImportBox\")'>開く／閉じる</button>" +
         (p.status === "draft" ? "<button class='btn small' onclick='confirmPlan(\"" + p.id + "\")'>確定する</button>" : "") +
         "<button class='btn small' onclick='carryPlan(\"" + p.id + "\")'>更新計画を作成</button>" +
         "<button class='btn warn small' onclick='delPlan(\"" + p.id + "\")'>×</button>" +
@@ -900,7 +1076,8 @@ function renderMonitorList() {
   box.innerHTML = "";
   dbGetAll("monitors").then(function (mons) {
     dbGetAll("plans").then(function (plans) {
-      var list = mons.filter(function (m) { return m.userId === state.user.id && m.orgId === state.org.id; });
+      var orgId = state.org ? state.org.id : null;
+      var list = mons.filter(function (m) { return m.userId === state.user.id && (orgId === null || m.orgId === orgId); });
       list.sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
       if (!list.length) { box.innerHTML = '<p class="hint">まだモニタリング記録がありません。計画から「モニタリング作成」してください。</p>'; return; }
       list.forEach(function (m) {
@@ -918,7 +1095,10 @@ function renderMonitorList() {
           "<div><strong>" + fmtJP(m.date) + "</strong> <span class='hint'>" + (p ? "第" + (p.version || 1) + "期の計画" : "（計画削除済み）") + "</span><br>" + tags + "</div>" +
           "<div class='row'>" +
           "<button class='btn sec small' onclick='printMonitor(\"" + m.id + "\")'>印刷</button>" +
-          "<button class='btn sec small' onclick='editMonitor(\"" + m.id + "\")'>編集</button>" +
+          "<button class='btn sec small' onclick='exportMonitorDocx(\"" + m.id + "\")'>Word出力</button>" +
+          "<button class='btn sec small' onclick='renderMonitorEdit(\"" + m.id + "\")'>編集</button>" +
+          "<button class='btn sec small' onclick='exportMonitorJson(\"" + m.id + "\")'>JSON</button>" +
+          "<button class='btn sec small' onclick='downloadMonitorJson(\"" + m.id + "\")'>保存</button>" +
           "<button class='btn warn small' onclick='delMonitor(\"" + m.id + "\")'>×</button></div></div>" +
           (m.updateNeeded === "あり" ? "<div class='hint' style='color:#b3261e'>更新の必要性: あり（" + esc((m.reason || "").slice(0, 40)) + "）</div>" : "");
         box.appendChild(d);
@@ -1082,7 +1262,8 @@ function renderMeetingList() {
   var box = document.getElementById("meetingList");
   box.innerHTML = "";
   dbGetAll("meetings").then(function (mtgs) {
-    var list = mtgs.filter(function (m) { return m.userId === state.user.id && m.orgId === state.org.id; });
+    var orgId = state.org ? state.org.id : null;
+    var list = mtgs.filter(function (m) { return m.userId === state.user.id && (orgId === null || m.orgId === orgId); });
     list.sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
     if (!list.length) { box.innerHTML = '<p class="hint">会議録はまだありません。</p>'; return; }
     list.forEach(function (m) {
@@ -1094,7 +1275,10 @@ function renderMeetingList() {
         (m.agenda ? "<br><span class='hint'>議題: " + esc(m.agenda.slice(0, 50)) + "</span>" : "") + "</div>" +
         "<div class='row'>" +
         "<button class='btn sec small' onclick='printMeeting(\"" + m.id + "\")'>印刷</button>" +
-        "<button class='btn sec small' onclick='editMeeting(\"" + m.id + "\")'>編集</button>" +
+        "<button class='btn sec small' onclick='exportMeetingDocx(\"" + m.id + "\")'>Word出力</button>" +
+        "<button class='btn sec small' onclick='renderMeetingEdit(\"" + m.id + "\")'>編集</button>" +
+        "<button class='btn sec small' onclick='exportMeetingJson(\"" + m.id + "\")'>JSON</button>" +
+        "<button class='btn sec small' onclick='downloadMeetingJson(\"" + m.id + "\")'>保存</button>" +
         "<button class='btn warn small' onclick='delMeeting(\"" + m.id + "\")'>×</button></div></div>";
       box.appendChild(d);
     });
@@ -1188,6 +1372,590 @@ function editMeeting(id) {
 function delMeeting(id) {
   if (!confirm("この会議録を削除しますか？")) return;
   dbDel("meetings", id).then(function () { renderUserDetail(); });
+}
+
+// ============ JSON取り込み（AI抽出・作成データ等） ============
+function toggleBox(id) {
+  var e = document.getElementById(id);
+  e.style.display = e.style.display === "none" ? "block" : "none";
+}
+function setImportMsg(id, text, ok) {
+  var el = document.getElementById(id);
+  el.textContent = text;
+  el.style.color = ok ? "" : "#b3261e";
+}
+function parseImport(id) {
+  var v = document.getElementById(id).value;
+  return JSON.parse(v);
+}
+function loadImportFile(taId, inputEl) {
+  var f = inputEl.files && inputEl.files[0];
+  if (!f) return;
+  var reader = new FileReader();
+  reader.onload = function () {
+    var ta = document.getElementById(taId);
+    if (ta) ta.value = reader.result;
+    inputEl.value = "";
+  };
+  reader.onerror = function () { alert("ファイルを読み込めませんでした"); };
+  reader.readAsText(f, "utf-8");
+}
+function isBackupFile(o) {
+  return o && typeof o === "object" && o.app === "kobetsu-plan-backup" && Array.isArray(o.users) && o.meta;
+}
+function validateImportJson(kind, o) {
+  if (isBackupFile(o)) return "これはバックアップ（全体）ファイルです。この欄ではなく「データ」画面の「取り込み（全データ上書き）」から復元してください。";
+  if (!o || typeof o !== "object" || Array.isArray(o)) return "JSONは { ... } のオブジェクト形式で渡してください";
+  if (kind === "face") {
+    if (!o.name && !o.face) return "フェイスシートJSONは {\"name\":\"氏名\",\"face\":{...}} の形で渡してください";
+  } else if (kind === "plan") {
+    if (!Array.isArray(o.items)) return "計画JSONには items（配列）が必要です";
+  } else if (kind === "monitor") {
+    if (typeof o.date !== "string") return "モニタリングJSONには date（日付）が必要です";
+    if (!Array.isArray(o.items)) return "モニタリングJSONには items（配列）が必要です";
+  } else if (kind === "meeting") {
+    if (typeof o.date !== "string") return "会議録JSONには date（日付）が必要です";
+    if (!(o.participants || o.agenda || o.decisions || o.tasks || o.note || o.type)) return "会議録JSONには participants / agenda / decisions / tasks / note / type のいずれかが必要です";
+  }
+  return null;
+}
+function importFaceJson() {
+  try {
+    var o = parseImport("faceJson");
+    var err = validateImportJson("face", o);
+    if (err) { setImportMsg("faceImportMsg", err, false); return; }
+    var u = state.user;
+    if (o.name) u.name = String(o.name).trim();
+    if (o.face && typeof o.face === "object") {
+      u.face = Object.assign({}, u.face || {}, o.face);
+      if (!u.face.family) u.face.family = [];
+      if (!u.face.supports) u.face.supports = { public: [], other: [] };
+      if (!u.face.createDate) u.face.createDate = todayStr();
+    }
+    dbPut("users", u).then(function () { renderUserDetail(); setImportMsg("faceImportMsg", "取り込みました", true); });
+  } catch (e) { setImportMsg("faceImportMsg", "JSONの構文が正しくありません", false); }
+}
+function importPlanJson() {
+  try {
+    var o = parseImport("planJson");
+    var err = validateImportJson("plan", o);
+    if (err) { setImportMsg("planImportMsg", err, false); return; }
+    var p = Object.assign({}, o);
+    p.id = uid();
+    p.orgId = state.org ? state.org.id : (o.orgId || null);
+    p.userId = state.user ? state.user.id : (o.userId || null);
+    p.status = p.status || "draft"; p.version = p.version || 1; p.createdAt = Date.now();
+    if (!p.items || !Array.isArray(p.items)) p.items = [];
+    dbPut("plans", p).then(function () { renderUserDetail(); setImportMsg("planImportMsg", "取り込みました", true); });
+  } catch (e) { setImportMsg("planImportMsg", "JSONの構文が正しくありません", false); }
+}
+function importMonitorJson() {
+  try {
+    var o = parseImport("monitorJson");
+    var err = validateImportJson("monitor", o);
+    if (err) { setImportMsg("monitorImportMsg", err, false); return; }
+    var m = Object.assign({}, o);
+    m.id = uid();
+    m.orgId = state.org ? state.org.id : (o.orgId || null);
+    m.userId = state.user ? state.user.id : (o.userId || null);
+    m.createdAt = Date.now();
+    if (!m.items || !Array.isArray(m.items)) m.items = [];
+    dbPut("monitors", m).then(function () { renderUserDetail(); setImportMsg("monitorImportMsg", "取り込みました", true); });
+  } catch (e) { setImportMsg("monitorImportMsg", "JSONの構文が正しくありません", false); }
+}
+function importMeetingJson() {
+  try {
+    var o = parseImport("meetingJson");
+    var err = validateImportJson("meeting", o);
+    if (err) { setImportMsg("meetingImportMsg", err, false); return; }
+    var m = Object.assign({}, o);
+    m.id = uid();
+    m.orgId = state.org ? state.org.id : (o.orgId || null);
+    m.userId = state.user ? state.user.id : (o.userId || null);
+    m.createdAt = Date.now();
+    if (!m.participants || !Array.isArray(m.participants)) m.participants = [];
+    dbPut("meetings", m).then(function () { renderUserDetail(); setImportMsg("meetingImportMsg", "取り込みました", true); });
+  } catch (e) { setImportMsg("meetingImportMsg", "JSONの構文が正しくありません", false); }
+}
+
+// ============ JSON出力（取り込み互換） ============
+function copyToImportBox(taId, msgId, obj) {
+  var ta = document.getElementById(taId);
+  if (!ta) return;
+  ta.value = JSON.stringify(obj, null, 2);
+  if (msgId) setImportMsg(msgId, "JSONを出力しました（編集して取り込めます）", true);
+}
+function openImportBox(id) {
+  var e = document.getElementById(id);
+  if (e) e.style.display = "block";
+}
+function cleanRecord(o) {
+  var c = Object.assign({}, o);
+  delete c.id; delete c.orgId; delete c.userId; delete c.createdAt;
+  return c;
+}
+function exportFaceJson() {
+  copyToImportBox("faceJson", "faceImportMsg", { name: state.user.name, face: state.user.face || {} });
+}
+function downloadFaceJson() {
+  download("face_" + state.user.id + ".json", JSON.stringify({ name: state.user.name, face: state.user.face || {} }, null, 2), "application/json");
+}
+function latestOf(list, dateField) {
+  var ls = list.filter(function (x) { return x && x.userId === state.user.id; });
+  if (!ls.length) ls = list.slice();
+  if (!ls.length) return null;
+  ls.sort(function (a, b) { return (b[dateField] || "").localeCompare(a[dateField] || ""); });
+  return ls[0];
+}
+function exportPlanJson(id) {
+  dbGetAll("plans").then(function (ps) {
+    var p = id ? ps.find(function (x) { return x.id === id; }) : latestOf(ps, "endDate");
+    if (!p) { alert("計画の記録がありません"); return; }
+    openImportBox("planImportBox");
+    copyToImportBox("planJson", "planImportMsg", cleanRecord(p));
+  });
+}
+function downloadPlanJson(id) {
+  dbGetAll("plans").then(function (ps) {
+    var p = id ? ps.find(function (x) { return x.id === id; }) : latestOf(ps, "endDate");
+    if (!p) { alert("計画の記録がありません"); return; }
+    download("plan_" + p.id + ".json", JSON.stringify(cleanRecord(p), null, 2), "application/json");
+  });
+}
+function exportMonitorJson(id) {
+  dbGetAll("monitors").then(function (ms) {
+    var m = id ? ms.find(function (x) { return x.id === id; }) : latestOf(ms, "date");
+    if (!m) { alert("モニタリングの記録がありません"); return; }
+    openImportBox("monitorImportBox");
+    copyToImportBox("monitorJson", "monitorImportMsg", cleanRecord(m));
+  });
+}
+function downloadMonitorJson(id) {
+  dbGetAll("monitors").then(function (ms) {
+    var m = id ? ms.find(function (x) { return x.id === id; }) : latestOf(ms, "date");
+    if (!m) { alert("モニタリングの記録がありません"); return; }
+    download("monitor_" + m.id + ".json", JSON.stringify(cleanRecord(m), null, 2), "application/json");
+  });
+}
+function exportMeetingJson(id) {
+  dbGetAll("meetings").then(function (mt) {
+    var m = id ? mt.find(function (x) { return x.id === id; }) : latestOf(mt, "date");
+    if (!m) { alert("会議録の記録がありません"); return; }
+    openImportBox("meetingImportBox");
+    copyToImportBox("meetingJson", "meetingImportMsg", cleanRecord(m));
+  });
+}
+function downloadMeetingJson(id) {
+  dbGetAll("meetings").then(function (mt) {
+    var m = id ? mt.find(function (x) { return x.id === id; }) : latestOf(mt, "date");
+    if (!m) { alert("会議録の記録がありません"); return; }
+    download("meeting_" + m.id + ".json", JSON.stringify(cleanRecord(m), null, 2), "application/json");
+  });
+}
+
+// ============ 編集プレビュー（印刷レイアウトで編集） ============
+var EDIT = { obj: null, store: null, id: null, render: null, msgId: null, t: null };
+function editStart(store, id, obj, renderFn) { EDIT.store = store; EDIT.id = id; EDIT.obj = obj; EDIT.render = renderFn; }
+function getPath(o, p) { var ks = p.split("."), c = o; for (var i = 0; i < ks.length - 1; i++) { if (c[ks[i]] == null) return undefined; c = c[ks[i]]; } return c[ks[ks.length - 1]]; }
+function setPath(o, p, v) { var ks = p.split("."), c = o; for (var i = 0; i < ks.length - 1; i++) { if (c[ks[i]] == null || typeof c[ks[i]] !== "object") c[ks[i]] = isFinite(ks[i + 1]) ? [] : {}; c = c[ks[i]]; } c[ks[ks.length - 1]] = v; }
+function editSet(p, v) { setPath(EDIT.obj, p, v); }
+function editSave() { clearTimeout(EDIT.t); EDIT.t = setTimeout(function () { dbPut(EDIT.store, EDIT.obj).then(function () { if (EDIT.msgId) { var e = document.getElementById(EDIT.msgId); if (e) e.textContent = "保存しました"; } }); }, 500); }
+function editSaveNow() { clearTimeout(EDIT.t); return dbPut(EDIT.store, EDIT.obj); }
+function blankFor(path) {
+  if (/family$/.test(path)) return { relation: "", name: "", age: "", job: "", note: "", main: false };
+  if (/public$/.test(path) || /other$/.test(path)) return { name: "", provider: "", content: "", freq: "", note: "" };
+  if (/items$/.test(path)) return { priority: "", need: "", goal: "", support: "", period: "", provider: "" };
+  if (/participants$/.test(path)) return { name: "", role: "" };
+  return {};
+}
+function editAdd(path) { var c = getPath(EDIT.obj, path); if (!Array.isArray(c)) { c = []; setPath(EDIT.obj, path, c); } c.push(blankFor(path)); if (EDIT.render) EDIT.render(); }
+function editDel(path, i) { var c = getPath(EDIT.obj, path); if (Array.isArray(c)) { c.splice(i, 1); if (EDIT.render) EDIT.render(); } }
+function edCell(path, val, multiline, attrs) { val = val == null ? "" : val; var a = attrs || ""; if (multiline) return '<textarea class="ed-cell" data-path="' + path + '" ' + a + ">" + esc(val) + "</textarea>"; return '<input class="ed-cell" data-path="' + path + '" value="' + esc(val) + '" ' + a + ">"; }
+function edSelect(path, val, opts) { var o = opts.map(function (v) { return "<option" + (v === val ? " selected" : "") + ">" + esc(v) + "</option>"; }).join(""); return '<select class="ed-cell" data-path="' + path + '">' + o + "</select>"; }
+function edToolbar(title, msgId, wordFn) {
+  EDIT.msgId = msgId;
+  var wordBtn = wordFn ? '<button class="btn sec small" onclick="' + wordFn + '">Word出力</button> ' : "";
+  return '<div class="epid-toolbar"><strong>' + title + "</strong> " + wordBtn +
+    '<button class="btn small" onclick="editSaveNow().then(function(){ window.__curPrint(); })">印刷</button> ' +
+    '<button class="btn sec small" onclick="backToUser()">閉じる</button> ' +
+    '<span class="hint" id="' + msgId + '"></span></div>';
+}
+if (typeof document !== "undefined") {
+  document.addEventListener("input", function (e) { if (e.target.matches("[data-path]")) { editSet(e.target.getAttribute("data-path"), e.target.value); editSave(); } });
+  document.addEventListener("change", function (e) { if (e.target.matches("[data-path]")) { editSet(e.target.getAttribute("data-path"), e.target.value); editSave(); } });
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-add]"); if (t) { editAdd(t.getAttribute("data-add")); return; }
+    var d = e.target.closest("[data-del]"); if (d) { editDel(d.getAttribute("data-del"), parseInt(d.getAttribute("data-idx"), 10)); return; }
+  });
+}
+
+function renderFaceEdit() {
+  var u = state.user; if (!u.face) u.face = {};
+  editStart("users", u.id, u, renderFaceEdit);
+  window.__curPrint = function () { editSaveNow().then(printFace); };
+  var f = u.face;
+  if (!f.family) f.family = [];
+  if (!f.supports) f.supports = { public: [], other: [] };
+  if (!f.createDate) f.createDate = todayStr();
+  var fam = f.family.map(function (m, i) {
+    return "<tr><td>" + edCell("face.family." + i + ".relation", m.relation) + "</td>" +
+      "<td>" + edCell("face.family." + i + ".name", m.name) + "</td>" +
+      "<td>" + edCell("face.family." + i + ".age", m.age, false, 'style="width:54px"') + "</td>" +
+      "<td>" + edCell("face.family." + i + ".job", m.job) + "</td>" +
+      "<td>" + edCell("face.family." + i + ".note", m.note, true) + "</td>" +
+      '<td><button class="btn warn small" data-del="face.family" data-idx="' + i + '">×</button></td></tr>';
+  }).join("");
+  var pub = (f.supports.public || []).map(function (s, i) {
+    return "<tr><td>" + edCell("face.supports.public." + i + ".name", s.name) + "</td>" +
+      "<td>" + edCell("face.supports.public." + i + ".provider", s.provider) + "</td>" +
+      "<td>" + edCell("face.supports.public." + i + ".content", s.content, true) + "</td>" +
+      "<td>" + edCell("face.supports.public." + i + ".freq", s.freq, false, 'style="width:70px"') + "</td>" +
+      "<td>" + edCell("face.supports.public." + i + ".note", s.note) + "</td>" +
+      '<td><button class="btn warn small" data-del="face.supports.public" data-idx="' + i + '">×</button></td></tr>';
+  }).join("");
+  var oth = (f.supports.other || []).map(function (s, i) {
+    return "<tr><td>" + edCell("face.supports.other." + i + ".name", s.name) + "</td>" +
+      "<td>" + edCell("face.supports.other." + i + ".provider", s.provider) + "</td>" +
+      "<td>" + edCell("face.supports.other." + i + ".content", s.content, true) + "</td>" +
+      "<td>" + edCell("face.supports.other." + i + ".freq", s.freq, false, 'style="width:70px"') + "</td>" +
+      "<td>" + edCell("face.supports.other." + i + ".note", s.note) + "</td>" +
+      '<td><button class="btn warn small" data-del="face.supports.other" data-idx="' + i + '">×</button></td></tr>';
+  }).join("");
+  var orgName = state.org ? state.org.name : "";
+  document.getElementById("faceEditBody").innerHTML =     edToolbar("フェイスシート（編集プレビュー）", "faceEditMsg", "exportFaceDocx()") +
+    '<div class="p-title">フェイスシート（基本情報）</div>' +
+    '<table class="pf"><tr><td class="lab" style="width:22%">作成日</td><td style="width:28%">' + edCell("face.createDate", f.createDate) + "</td>" +
+    '<td class="lab" style="width:22%">相談支援事業者名</td><td>' + edCell("face.agency", f.agency) + "</td></tr>" +
+    '<tr><td class="lab">計画作成担当者</td><td>' + edCell("face.planner", f.planner) + '</td><td class="lab">事業所名</td><td>' + esc(orgName) + "</td></tr></table>" +
+    '<table class="pf"><tr><td class="lab2">1　概要（支援経過・現状と課題等）</td></tr><tr><td>' + edCell("face.overview", f.overview, true) + "</td></tr></table>" +
+    '<table class="pf"><tr><td class="biglab" colspan="4">2　利用者の現状</td></tr>' +
+    '<tr><td class="lab">氏名</td><td>' + edCell("name", u.name) + '</td><td class="lab">生年月日</td><td>' + edCell("face.birthday", f.birthday) + "（" + (f.birthday ? calcAge(f.birthday) : "") + "）</td></tr>" +
+    '<tr><td class="lab">障害または疾患名</td><td>' + edCell("face.disability", f.disability) + '</td><td class="lab">障害程度区分</td><td>' + edCell("face.grade", f.grade) + "</td></tr>" +
+    '<tr><td class="lab">性別</td><td>' + edCell("face.gender", f.gender) + '</td><td class="lab">住居種別</td><td>' + edCell("face.housing", f.housing) + "</td></tr>" +
+    '<tr><td class="lab">住所</td><td colspan="3">' + edCell("face.address", f.address) + "</td></tr>" +
+    '<tr><td class="lab">電話番号</td><td>' + edCell("face.phone", f.phone) + '</td><td class="lab">FAX番号</td><td>' + edCell("face.fax", f.fax) + "</td></tr></table>" +
+    '<table class="pf"><tr><td class="lab2">家族構成（※主たる介護者の氏名に○）</td></tr></table>' +
+    '<table class="pf"><tr><th style="width:18%">続柄</th><th style="width:24%">氏名</th><th style="width:9%">年齢</th><th style="width:24%">職業</th><th>備考</th><th style="width:34px"></th></tr>' + fam + "</table>" +
+    '<button class="btn sec small ed-add" data-add="face.family">＋ 家族を追加</button>' +
+    '<table class="pf"><tr><td class="lab2">社会関係図（印刷後、手書きで記入）</td></tr><tr><td class="pblank" style="height:150px"></td></tr></table>' +
+    '<table class="pf"><tr><td class="lab2">生活歴（※受診歴等含む）</td></tr><tr><td>' + edCell("face.life", f.life, true) + "</td></tr></table>" +
+    '<table class="pf"><tr><td class="lab2">医療の状況（※受診科目、頻度、主治医、疾患名、服薬状況等）</td></tr><tr><td>' + edCell("face.medical", f.medical, true) + "</td></tr></table>" +
+    '<table class="pf"><tr><td class="lab">本人の主訴（意向・希望）</td><td>' + edCell("face.selfComplaint", f.selfComplaint, true) + "</td></tr>" +
+    '<tr><td class="lab">家族の主訴（意向・希望）</td><td>' + edCell("face.familyComplaint", f.familyComplaint, true) + "</td></tr></table>" +
+    '<table class="pf"><tr><td class="biglab" colspan="5">3　支援の状況</td></tr><tr><td colspan="5" class="lab2">公的支援（障害福祉サービス、介護保険等）</td></tr>' +
+    '<tr><th style="width:16%">名称</th><th style="width:22%">提供機関・提供者</th><th style="width:32%">支援の内容</th><th style="width:14%">頻度</th><th>備考</th><th style="width:34px"></th></tr>' + pub + "</table>" +
+    '<button class="btn sec small ed-add" data-add="face.supports.public">＋ 公的支援を追加</button>' +
+    '<table class="pf"><tr><td colspan="5" class="lab2">その他の支援</td></tr>' +
+    '<tr><th style="width:16%">名称</th><th style="width:22%">提供機関・提供者</th><th style="width:32%">支援の内容</th><th style="width:14%">頻度</th><th>備考</th><th style="width:34px"></th></tr>' + oth + "</table>" +
+    '<button class="btn sec small ed-add" data-add="face.supports.other">＋ その他の支援を追加</button>';
+  showScreen("screen-face-edit");
+}
+
+function renderPlanEdit(id) {
+  dbGetAll("plans").then(function (plans) {
+    var p = plans.find(function (x) { return x.id === id; });
+    if (!p) return;
+    editStart("plans", id, p, function () { renderPlanEdit(id); });
+    window.__curPrint = function () { editSaveNow().then(function () { printPlan(id); }); };
+    if (!p.items) p.items = [];
+    var draftMark = p.status === "draft" ? '<div style="text-align:center;font-size:14pt;font-weight:700;color:#b3261e">（案）</div>' : "";
+    var rows = p.items.map(function (it, i) {
+      return "<tr><td style=\"text-align:center\">" + edCell("items." + i + ".priority", it.priority, false, 'style="width:40px"') + "</td>" +
+        "<td>" + edCell("items." + i + ".need", it.need, true) + "</td>" +
+        "<td>" + edCell("items." + i + ".goal", it.goal, true) + "</td>" +
+        "<td>" + edCell("items." + i + ".support", it.support, true) + "</td>" +
+        "<td>" + edCell("items." + i + ".period", it.period, false, 'style="width:80px"') + "</td>" +
+        "<td>" + edCell("items." + i + ".provider", it.provider, false, 'style="width:120px"') + "</td>" +
+        '<td><button class="btn warn small" data-del="items" data-idx="' + i + '">×</button></td></tr>';
+    }).join("");
+    document.getElementById("planEditBody").innerHTML =       edToolbar("個別支援計画（編集プレビュー）", "planEditMsg", "exportPlanDocx('" + id + "')") +
+      '<div class="p-title">個別支援計画</div>' + draftMark +
+      '<table class="pf"><tr><td class="lab">利用者氏名</td><td>' + esc(state.user.name) + "</td>" +
+      '<td class="lab">個別支援計画作成年月日</td><td>' + edCell("createdDate", p.createdDate, false, 'style="width:130px"') + "</td></tr>" +
+      '<tr><td class="lab">支援提供期間</td><td colspan="3">' + edCell("startDate", p.startDate, false, 'style="width:120px"') + " から " + edCell("endDate", p.endDate, false, 'style="width:120px"') + " まで</td></tr></table>" +
+      '<table class="pf"><tr><td class="lab2">総合的な援助の方針</td></tr><tr><td>' + edCell("policy", p.policy, true) + "</td></tr></table>" +
+      '<table class="pf"><tr><td class="biglab" rowspan="2" style="width:12%">到 達 目 標</td><td class="lab" style="width:14%">長期目標</td><td>' + edCell("longGoal", p.longGoal, true) + "</td></tr>" +
+      '<tr><td class="lab">短期目標</td><td>' + edCell("shortGoal", p.shortGoal, true) + "</td></tr></table>" +
+      '<table class="pf"><tr><td class="biglab" colspan="7">具体的な到達目標及び支援計画等</td></tr>' +
+      '<tr><th style="width:8%">優先順位</th><th style="width:17%">ニーズ・課題</th><th style="width:18%">具体的な到達目標</th><th style="width:25%">支援内容</th><th style="width:13%">支援期間</th><th style="width:19%">サービス提供機関</th><th style="width:34px"></th></tr>' + rows + "</table>" +
+      '<button class="btn sec small ed-add" data-add="items">＋ 項目を追加</button>' +
+      '<table class="pf"><tr><td class="lab">事業所名</td><td>' + edCell("orgName", p.orgName) + "</td></tr>" +
+      '<tr><td class="lab" style="width:16%">確定日</td><td style="width:40%">' + edCell("confirmedDate", p.confirmedDate, false, 'style="width:130px"') + "</td>" +
+      '<td class="lab" style="width:16%">サービス管理責任者</td><td>' + edCell("manager", p.manager) + "</td></tr></table>";
+    showScreen("screen-plan-edit");
+  });
+}
+
+function renderMonitorEdit(id) {
+  dbGetAll("monitors").then(function (ms) {
+    var m = ms.find(function (x) { return x.id === id; });
+    if (!m) return;
+    editStart("monitors", id, m, function () { renderMonitorEdit(id); });
+    window.__curPrint = function () { editSaveNow().then(function () { printMonitor(id); }); };
+    if (!m.items) m.items = [];
+    if (!m.planInfo) m.planInfo = {};
+    var pi = m.planInfo;
+    var rows = m.items.map(function (it, i) {
+      return "<tr><td style=\"text-align:center\">" + edCell("items." + i + ".priority", it.priority, false, 'style="width:40px"') + "</td>" +
+        "<td>" + edCell("items." + i + ".goal", it.goal, true) + "</td>" +
+        '<td style="text-align:center;width:150px">' + edSelect("items." + i + ".eval", it.eval || "", ["達成", "ほぼ達成", "未達成"]) + "</td>" +
+        "<td>" + edCell("items." + i + ".analysis", it.analysis, true) + "</td>" +
+        "<td>" + edCell("items." + i + ".action", it.action, true) + "</td>" +
+        '<td><button class="btn warn small" data-del="items" data-idx="' + i + '">×</button></td></tr>';
+    }).join("");
+    document.getElementById("monitorEditBody").innerHTML =       edToolbar("モニタリング（編集プレビュー）", "monitorEditMsg", "exportMonitorDocx('" + id + "')") +
+      '<div class="p-title">個別支援計画　モニタリング（６か月）</div>' +
+      '<table class="pf"><tr><td class="lab">利用者氏名</td><td>' + esc(state.user.name) + "</td>" +
+      '<td class="lab">個別支援計画作成年月日</td><td>' + edCell("planInfo.createdDate", pi.createdDate, false, 'style="width:130px"') + "</td></tr>" +
+      '<tr><td class="lab">支援提供期間</td><td colspan="3">' + edCell("planInfo.startDate", pi.startDate, false, 'style="width:120px"') + " から " + edCell("planInfo.endDate", pi.endDate, false, 'style="width:120px"') + " まで</td></tr></table>" +
+      '<table class="pf"><tr><td class="lab2">総合的な援助の方針</td></tr><tr><td>' + edCell("planInfo.policy", pi.policy, true) + "</td></tr></table>" +
+      '<table class="pf"><tr><td class="biglab" rowspan="2" style="width:12%">到 達 目 標</td><td class="lab" style="width:14%">長期目標</td><td>' + edCell("planInfo.longGoal", pi.longGoal, true) + "</td></tr>" +
+      '<tr><td class="lab">短期目標</td><td>' + edCell("planInfo.shortGoal", pi.shortGoal, true) + "</td></tr></table>" +
+      '<table class="pf"><tr><td class="biglab" colspan="5">達成状況の評価</td></tr>' +
+      '<tr><th style="width:8%">優先順位</th><th style="width:20%">具体的な到達目標</th><th style="width:24%">達成状況の評価</th><th style="width:26%">支援内容と課題分析</th><th style="width:22%">今後の対応</th><th style="width:34px"></th></tr>' + rows + "</table>" +
+      '<table class="pf"><tr><td class="lab">現時点での一般就労の可能性</td><td style="width:26%">' + edSelect("job", m.job || "", ["あり", "なし"]) + "</td>" +
+      '<td class="lab">他のサービス移行の可能性</td><td style="width:26%">' + edSelect("transfer", m.transfer || "", ["あり", "なし"]) + "</td>" +
+      '<td class="lab">他事業所利用の可能性</td><td>' + edSelect("otherOrg", m.otherOrg || "", ["あり", "なし"]) + "</td></tr>" +
+      '<tr><td class="lab">更新の必要性</td><td>' + edSelect("updateNeeded", m.updateNeeded || "", ["あり", "なし"]) + '</td><td colspan="4" class="hint" style="font-size:9pt">※全て あり・なし いずれかに○をつけ、下に理由を記入</td></tr></table>' +
+      '<table class="pf"><tr><td class="lab2">上記の判断の理由</td></tr><tr><td>' + edCell("reason", m.reason, true) + "</td></tr></table>" +
+      '<table class="pf"><tr><td class="lab">事業所名</td><td>' + edCell("orgName", m.orgName) + '</td><td class="lab">モニタリング実施日</td><td>' + edCell("date", m.date, false, 'style="width:130px"') + "</td>" +
+      '<td class="lab">サービス管理責任者</td><td>' + edCell("manager", m.manager) + "</td></tr></table>";
+    showScreen("screen-monitor-edit");
+  });
+}
+
+function renderMeetingEdit(id) {
+  dbGetAll("meetings").then(function (mtgs) {
+    var m = mtgs.find(function (x) { return x.id === id; });
+    if (!m) return;
+    editStart("meetings", id, m, function () { renderMeetingEdit(id); });
+    window.__curPrint = function () { editSaveNow().then(function () { printMeeting(id); }); };
+    if (!m.participants) m.participants = [];
+    var rows = m.participants.map(function (p, i) {
+      return "<tr><td>" + edCell("participants." + i + ".name", p.name) + "</td>" +
+        "<td>" + edCell("participants." + i + ".role", p.role) + "</td>" +
+        '<td class="pblank" style="height:36px"></td>' +
+        '<td><button class="btn warn small" data-del="participants" data-idx="' + i + '">×</button></td></tr>';
+    }).join("");
+    document.getElementById("meetingEditBody").innerHTML =       edToolbar("会議録（編集プレビュー）", "meetingEditMsg", "exportMeetingDocx('" + id + "')") +
+      '<div class="p-title">会 議 録</div>' +
+      '<table class="pf"><tr><td class="lab">開催日時</td><td>' + edCell("date", m.date, false, 'style="width:120px"') + " " + edCell("time", m.time, false, 'style="width:80px"') + "</td>" +
+      '<td class="lab">場所</td><td>' + edCell("place", m.place) + "</td></tr>" +
+      '<tr><td class="lab">対象利用者</td><td>' + esc(state.user.name) + "</td>" +
+      '<td class="lab">事業所名</td><td>' + edCell("orgName", m.orgName) + "</td></tr></table>" +
+      '<table class="pf"><tr><td class="lab">議題</td><td>' + edCell("agenda", m.agenda, true) + "</td></tr>" +
+      "<tr><td class='lab'>協議内容</td><td>" + edCell("content", m.content, true) + "</td></tr>" +
+      "<tr><td class='lab'>決定事項</td><td>" + edCell("decision", m.decision, true) + "</td></tr>" +
+      "<tr><td class='lab'>次回予定</td><td>" + edCell("nextDate", m.nextDate, false, 'style="width:130px"') + "</td></tr></table>" +
+      '<table class="pf"><tr><td class="lab2">参加者（署名・押印）</td></tr></table>' +
+      '<table class="pf"><tr><th style="width:34%">氏名</th><th style="width:26%">役職</th><th style="width:40%">署名・押印</th><th style="width:34px"></th></tr>' + rows + "</table>" +
+      '<button class="btn sec small ed-add" data-add="participants">＋ 参加者を追加</button>';
+    showScreen("screen-meeting-edit");
+  });
+}
+
+// ============ Word(.docx) 出力（外部依存ゼロ） ============
+var CRC_TABLE = (function () { var table = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) { c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); } table[n] = c >>> 0; } return table; })();
+function crc32(buf) { var c = 0xFFFFFFFF; for (var i = 0; i < buf.length; i++) { c = (c >>> 8) ^ CRC_TABLE[(c ^ buf[i]) & 0xFF]; } return (c ^ 0xFFFFFFFF) >>> 0; }
+function strToBytes(s) { var a = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) a[i] = s.charCodeAt(i) & 0xFF; return a; }
+function u16(n) { return String.fromCharCode(n & 0xFF, (n >>> 8) & 0xFF); }
+function u32(n) { return String.fromCharCode(n & 0xFF, (n >>> 8) & 0xFF, (n >>> 16) & 0xFF, (n >>> 24) & 0xFF); }
+function dosDT(d) { return [((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate(), (d.getHours() << 11) | (d.getMinutes() << 5) | Math.floor(d.getSeconds() / 2)]; }
+async function deflateRaw(raw) {
+  if (typeof CompressionStream !== "function") return raw;
+  try {
+    var st = new Blob([raw]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+    return new Uint8Array(await new Response(st).arrayBuffer());
+  } catch (e) { return raw; }
+}
+async function makeZip(files) {
+  var enc = new TextEncoder();
+  var chunks = [], central = [], offset = 0;
+  var _dt = dosDT(new Date()), _tm = u16(_dt[1]), _da = u16(_dt[0]);
+  for (var fi = 0; fi < files.length; fi++) {
+    var f = files[fi];
+    var data = typeof f.data === "string" ? enc.encode(f.data) : f.data;
+    var crc = crc32(data), size = data.length;
+    var comp = await deflateRaw(data), method = comp === data ? 0 : 8;
+    var nb = enc.encode(f.name);
+    var lh = "PK\x03\x04" + u16(20) + u16(0) + u16(method) + _tm + _da + u32(crc) + u32(comp.length) + u32(size) + u16(nb.length) + u16(0);
+    chunks.push(strToBytes(lh), nb, comp);
+    var cd = "PK\x01\x02" + u16(20) + u16(20) + u16(0) + u16(method) + _tm + _da + u32(crc) + u32(comp.length) + u32(size) + u16(nb.length) + u16(0) + u16(0) + u16(0) + u16(0) + u32(0) + u32(offset);
+    central.push(strToBytes(cd), nb);
+    offset += lh.length + nb.length + comp.length;
+  }
+  var cs = central.reduce(function (a, b) { return a + b.length; }, 0), end = "PK\x05\x06" + u16(0) + u16(0) + u16(files.length) + u16(files.length) + u32(cs) + u32(offset) + u16(0);
+  var out = new Uint8Array(offset + cs + end.length), pos = 0;
+  chunks.forEach(function (c) { out.set(c, pos); pos += c.length; });
+  central.forEach(function (c) { out.set(c, pos); pos += c.length; });
+  out.set(strToBytes(end), pos);
+  return out;
+}
+function xesc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function runs(text) { return xesc(text).split("\n").map(function (l) { return "<w:t xml:space=\"preserve\">" + l + "</w:t>"; }).join("<w:br/>"); }
+function cellXml(text, opts) { opts = opts || {}; var align = opts.align ? "<w:jc w:val=\"" + opts.align + "\"/>" : ""; var rp = ""; if (opts.bold) rp += "<w:b/>"; if (opts.color) rp += "<w:color w:val=\"" + opts.color + "\"/>"; if (opts.size) rp += "<w:sz w:val=\"" + opts.size + "\"/><w:szCs w:val=\"" + opts.size + "\"/>"; var rpr = rp ? "<w:rPr>" + rp + "</w:rPr>" : ""; var sp = "<w:spacing w:before=\"20\" w:after=\"20\" w:line=\"240\" w:lineRule=\"auto\"/>"; return "<w:p><w:pPr>" + sp + align + "</w:pPr><w:r>" + rpr + runs(text) + "</w:r></w:p>"; }
+function tblXml(rows, widths, opts) {
+  opts = opts || {};
+  var maxCol = 1;
+  rows.forEach(function (r) { var s = 0; r.forEach(function (c) { s += (c && c.span) || 1; }); if (s > maxCol) maxCol = s; });
+  var ws = [], fixed = Array.isArray(widths) && widths.length === maxCol;
+  if (fixed) { ws = widths.slice(); } else { var eq = Math.floor(9000 / maxCol); for (var q = 0; q < maxCol; q++) ws.push(eq); }
+  var grid = "";
+  for (var i = 0; i < maxCol; i++) grid += "<w:gridCol w:w=\"" + ws[i] + "\"/>";
+  var border = "<w:tblBorders>" + ["top", "left", "bottom", "right", "insideH", "insideV"].map(function (b) { return "<w:" + b + " w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"auto\"/>"; }).join("") + "</w:tblBorders>";
+  var cellMar = "<w:tblCellMar><w:top w:w=\"60\" w:type=\"dxa\"/><w:left w:w=\"100\" w:type=\"dxa\"/><w:bottom w:w=\"60\" w:type=\"dxa\"/><w:right w:w=\"100\" w:type=\"dxa\"/></w:tblCellMar>";
+  var trH = opts.minRowH ? opts.minRowH : 200;
+  var trs = rows.map(function (r) {
+    var ci = 0;
+    var tcs = r.map(function (c) {
+      c = c || {};
+      var span = c.span || 1;
+      var w = 0; for (var k = 0; k < span; k++) w += ws[ci + k] || ws[ws.length - 1];
+      ci += span;
+      var vm = c.vm === "r" ? "<w:vMerge w:val=\"restart\"/>" : (c.vm === "c" ? "<w:vMerge/>" : "");
+      var shd = c.shade ? "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"" + c.shade + "\"/>" : "";
+      var va = c.valign ? "<w:vAlign w:val=\"" + c.valign + "\"/>" : "";
+      var tcPr = "<w:tcPr><w:tcW w:w=\"" + w + "\" w:type=\"dxa\"/>" + (span > 1 ? "<w:gridSpan w:val=\"" + span + "\"/>" : "") + vm + shd + va + "</w:tcPr>";
+      return "<w:tc>" + tcPr + cellXml(c.vm === "c" ? "" : (c.t == null ? "" : c.t), c) + "</w:tc>";
+    }).join("");
+    return "<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val=\"" + trH + "\" w:hRule=\"atLeast\"/></w:trPr>" + tcs + "</w:tr>";
+  }).join("");
+  var tblW = fixed ? "<w:tblW w:w=\"" + ws.reduce(function (a2, b2) { return a2 + b2; }, 0) + "\" w:type=\"dxa\"/>" : "<w:tblW w:w=\"5000\" w:type=\"pct\"/>";
+  var layout = fixed ? "<w:tblLayout w:type=\"fixed\"/>" : "<w:tblLayout w:type=\"autofit\"/>";
+  return "<w:tbl><w:tblPr>" + tblW + border + layout + cellMar + "</w:tblPr><w:tblGrid>" + grid + "</w:tblGrid>" + trs + "</w:tbl>";
+}
+function hXml(text) { return "<w:p><w:pPr><w:keepNext/><w:spacing w:before=\"0\" w:after=\"80\" w:line=\"280\" w:lineRule=\"auto\"/><w:jc w:val=\"center\"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val=\"32\"/></w:rPr><w:t xml:space=\"preserve\">" + xesc(text) + "</w:t></w:r></w:p>"; }
+function pXml(text, opts) { opts = opts || {}; var ppr = opts.align ? "<w:jc w:val=\"" + opts.align + "\"/>" : ""; var rpr = ""; if (opts.bold) rpr += "<w:b/>"; if (opts.color) rpr += "<w:color w:val=\"" + opts.color + "\"/>"; if (opts.size) rpr += "<w:sz w:val=\"" + opts.size + "\"/>"; rpr = rpr ? "<w:rPr>" + rpr + "</w:rPr>" : ""; var sp = "<w:spacing w:before=\"0\" w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/>"; return "<w:p><w:pPr>" + sp + ppr + "</w:pPr><w:r>" + rpr + "<w:t xml:space=\"preserve\">" + xesc(text) + "</w:t></w:r></w:p>"; }
+async function buildDocx(blocks, title) {
+  title = title || "文書";
+  var now = new Date(), pad2 = function (n) { return (n < 10 ? "0" : "") + n; };
+  var iso = now.getFullYear() + "-" + pad2(now.getMonth() + 1) + "-" + pad2(now.getDate()) + "T" + pad2(now.getHours()) + ":" + pad2(now.getMinutes()) + ":" + pad2(now.getSeconds()) + "Z";
+  var sect = "<w:sectPr><w:pgSz w:w=\"11906\" w:h=\"16838\" w:orient=\"portrait\"/><w:pgMar w:top=\"567\" w:right=\"680\" w:bottom=\"567\" w:left=\"680\" w:header=\"0\" w:footer=\"0\" w:gutter=\"0\"/></w:sectPr>";
+  var doc = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body>" + blocks.join("") + sect + "</w:body></w:document>";
+  var ct = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/><Override PartName=\"/word/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml\"/><Override PartName=\"/word/settings.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml\"/><Override PartName=\"/word/fontTable.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml\"/><Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/><Override PartName=\"/docProps/app.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.extended-properties+xml\"/></Types>";
+  var rl = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties\" Target=\"docProps/core.xml\"/><Relationship Id=\"rId3\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties\" Target=\"docProps/app.xml\"/></Relationships>";
+  var drl = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings\" Target=\"settings.xml\"/><Relationship Id=\"rId3\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable\" Target=\"fontTable.xml\"/></Relationships>";
+  var st = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii=\"游ゴシック\" w:eastAsia=\"游ゴシック\" w:hAnsi=\"游ゴシック\" w:cs=\"游ゴシック\"/><w:sz w:val=\"21\"/><w:szCs w:val=\"21\"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:before=\"0\" w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type=\"paragraph\" w:default=\"1\" w:styleId=\"Normal\"><w:name w:val=\"Normal\"/><w:qFormat/><w:pPr><w:spacing w:before=\"0\" w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/></w:pPr><w:rPr><w:rFonts w:ascii=\"游ゴシック\" w:eastAsia=\"游ゴシック\" w:hAnsi=\"游ゴシック\" w:cs=\"游ゴシック\"/><w:sz w:val=\"21\"/><w:szCs w:val=\"21\"/></w:rPr></w:style></w:styles>";
+  var setg = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<w:settings xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:zoom w:percent=\"100\"/><w:defaultTabStop w:val=\"420\"/><w:compat><w:compatSetting w:name=\"compatibilityMode\" w:uri=\"http://schemas.microsoft.com/office/word\" w:val=\"15\"/></w:compat></w:settings>";
+  var ft = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<w:fonts xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:font w:name=\"游ゴシック\"><w:altName w:val=\"Yu Gothic\"/><w:family w:val=\"auto\"/><w:pitch w:val=\"variable\"/></w:font><w:font w:name=\"ＭＳ 明朝\"><w:family w:val=\"roman\"/><w:pitch w:val=\"fixed\"/></w:font></w:fonts>";
+  var core = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<cp:coreProperties xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:dcterms=\"http://purl.org/dc/terms/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"><dc:title>" + xesc(title) + "</dc:title><dc:creator>SUUMORE TSUCHIURA</dc:creator><cp:lastModifiedBy>SUUMORE TSUCHIURA</cp:lastModifiedBy><dcterms:created xsi:type=\"dcterms:W3CDTF\">" + iso + "</dcterms:created><dcterms:modified xsi:type=\"dcterms:W3CDTF\">" + iso + "</dcterms:modified></cp:coreProperties>";
+  var app = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\" xmlns:vt=\"http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes\"><Application>Microsoft Office Word</Application><DocSecurity>0</DocSecurity><ScaleCrop>false</ScaleCrop><Company></Company><LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged><AppVersion>16.0000</AppVersion></Properties>";
+  var zip = await makeZip([{ name: "[Content_Types].xml", data: ct }, { name: "_rels/.rels", data: rl }, { name: "word/document.xml", data: doc }, { name: "word/_rels/document.xml.rels", data: drl }, { name: "word/styles.xml", data: st }, { name: "word/settings.xml", data: setg }, { name: "word/fontTable.xml", data: ft }, { name: "docProps/core.xml", data: core }, { name: "docProps/app.xml", data: app }]);
+  return new Blob([zip], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+}
+function downloadBlob(blob, filename) { var url = URL.createObjectURL(blob); var a = document.createElement("a"); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000); }
+function lab(t) { return { t: t, bold: true, align: "center", shade: "F0F2F5", valign: "center" }; }
+
+function exportFaceDocx() {
+  var u = state.user, f = u.face || {};
+  var orgName = state.org ? state.org.name : "";
+  var age = f.birthday ? calcAge(f.birthday) : "";
+  if (typeof age !== "number" || isNaN(age)) age = "";
+  var b = [];
+  b.push(hXml("フェイスシート（基本情報）"));
+  b.push(tblXml([[lab("作成日"), { t: f.createDate || "" }, lab("相談支援事業者名"), { t: f.agency || "" }]]));
+  b.push(tblXml([[lab("計画作成担当者"), { t: f.planner || "" }, lab("事業所名"), { t: orgName }]]));
+  b.push(tblXml([[lab("1　概要（支援経過・現状と課題等）", { span: 4 })]]));
+  b.push(tblXml([[{ t: f.overview || "", span: 4 }]]));
+  b.push(tblXml([[lab("2　利用者の現状", { span: 4, bold: true })]]));
+  b.push(tblXml([[lab("氏名"), { t: u.name || "" }, lab("生年月日"), { t: (f.birthday || "") + (age !== "" ? "（" + age + "）" : "") }]]));
+  b.push(tblXml([[lab("障害または疾患名"), { t: f.disability || "" }, lab("障害程度区分"), { t: f.grade || "" }]]));
+  b.push(tblXml([[lab("性別"), { t: f.gender || "" }, lab("住居種別"), { t: f.housing || "" }]]));
+  b.push(tblXml([[lab("住所"), { t: f.address || "", span: 3 }]]));
+  b.push(tblXml([[lab("電話番号"), { t: f.phone || "" }, lab("FAX番号"), { t: f.fax || "" }]]));
+  b.push(tblXml([[lab("家族構成（※主たる介護者の氏名に○）", { span: 5 })]]));
+  var fam = [[lab("続柄"), lab("氏名"), lab("年齢"), lab("職業"), lab("備考")]];
+  (f.family || []).forEach(function (m) { fam.push([{ t: m.relation || "" }, { t: m.name || "" }, { t: m.age || "" }, { t: m.job || "" }, { t: m.note || "" }]); });
+  b.push(tblXml(fam));
+  b.push(tblXml([[lab("社会関係図（印刷後、手書きで記入）", { span: 4 })]]));
+  b.push(tblXml([[{ t: "", span: 4 }]]));
+  b.push(tblXml([[lab("生活歴（※受診歴等含む）", { span: 4 })]]));
+  b.push(tblXml([[{ t: f.life || "", span: 4 }]]));
+  b.push(tblXml([[lab("医療の状況（※受診科目、頻度、主治医、疾患名、服薬状況等）", { span: 4 })]]));
+  b.push(tblXml([[{ t: f.medical || "", span: 4 }]]));
+  b.push(tblXml([[lab("本人の主訴（意向・希望）"), { t: f.selfComplaint || "", span: 3 }]]));
+  b.push(tblXml([[lab("家族の主訴（意向・希望）"), { t: f.familyComplaint || "", span: 3 }]]));
+  b.push(tblXml([[lab("3　支援の状況", { span: 5, bold: true })]]));
+  b.push(tblXml([[lab("公的支援（障害福祉サービス、介護保険等）", { span: 5 })]]));
+  var pub = [[lab("名称"), lab("提供機関・提供者"), lab("支援の内容"), lab("頻度"), lab("備考")]];
+  ((f.supports && f.supports.public) || []).forEach(function (s) { pub.push([{ t: s.name || "" }, { t: s.provider || "" }, { t: s.content || "" }, { t: s.freq || "" }, { t: s.note || "" }]); });
+  b.push(tblXml(pub));
+  b.push(tblXml([[lab("その他の支援", { span: 5 })]]));
+  var oth = [[lab("名称"), lab("提供機関・提供者"), lab("支援の内容"), lab("頻度"), lab("備考")]];
+  ((f.supports && f.supports.other) || []).forEach(function (s) { oth.push([{ t: s.name || "" }, { t: s.provider || "" }, { t: s.content || "" }, { t: s.freq || "" }, { t: s.note || "" }]); });
+  b.push(tblXml(oth));
+  buildDocx(b, "フェイスシート").then(function (blob) { downloadBlob(blob, "フェイスシート_" + u.name + ".docx"); });
+}
+function exportPlanDocx(id) {
+  dbGetAll("plans").then(function (plans) {
+    var p = plans.find(function (x) { return x.id === id; }); if (!p) return;
+    var b = [];
+    b.push(hXml("個別支援計画"));
+    if (p.status === "draft") b.push(pXml("（案）", { align: "center", bold: true, size: "24", color: "B3261E" }));
+    b.push(tblXml([
+      [lab("利用者氏名"), { t: state.user.name || "" }, lab("個別支援計画作成年月日"), { t: fmtJPy(p.createdDate) || "" }],
+      [lab("支援提供期間"), { t: (fmtJPy(p.startDate) || "") + "　から　" + (fmtJPy(p.endDate) || "") + "　まで", span: 3 }]
+    ], [1600, 3646, 2700, 2600]));
+    b.push(tblXml([[lab("総合的な援助の方針")], [{ t: p.policy || "" }]], [10546], { minRowH: 700 }));
+    b.push(tblXml([
+      [{ t: "到　達　目　標", bold: true, align: "center", shade: "F0F2F5", valign: "center", vm: "r" }, lab("長期目標"), { t: p.longGoal || "" }],
+      [{ vm: "c" }, lab("短期目標"), { t: p.shortGoal || "" }]
+    ], [1700, 2300, 6546], { minRowH: 600 }));
+    b.push(tblXml([[lab("具体的な到達目標及び支援計画等")]], [10546]));
+    var rows = [[lab("優先\n順位"), lab("ニーズ・課題"), lab("具体的な到達目標"), lab("支援内容（内容、留意点等）"), lab("支援\n期間"), lab("サービス提供機関（提供者・担当者等）")]];
+    (p.items || []).forEach(function (it) {
+      rows.push([
+        { t: it.priority || "", align: "center", valign: "center" },
+        { t: it.need || "" },
+        { t: it.goal || "" },
+        { t: it.support || "" },
+        { t: it.period || "", valign: "center" },
+        { t: it.provider || "", valign: "center" }
+      ]);
+    });
+    b.push(tblXml(rows, [850, 1790, 1900, 3325, 685, 1996]));
+    b.push(tblXml([[lab("事業所名"), { t: p.orgName || "", span: 3 }]], [1600, 3646, 2700, 2600]));
+    b.push(tblXml([[lab("確定日"), { t: fmtJPy(p.confirmedDate) || "" }, lab("サービス管理責任者"), { t: p.manager || "" }]], [1600, 3646, 2700, 2600]));
+    buildDocx(b, "個別支援計画").then(function (blob) { downloadBlob(blob, "個別支援計画_" + state.user.name + ".docx"); });
+  });
+}
+function exportMonitorDocx(id) {
+  dbGetAll("monitors").then(function (ms) {
+    var m = ms.find(function (x) { return x.id === id; }); if (!m) return;
+    var pi = m.planInfo || {}, b = [];
+    b.push(hXml("個別支援計画　モニタリング（６か月）"));
+    b.push(tblXml([[lab("利用者氏名"), { t: state.user.name || "" }, lab("個別支援計画作成年月日"), { t: fmtJPy(pi.createdDate) || "" }]]));
+    b.push(tblXml([[lab("支援提供期間"), { t: (fmtJPy(pi.startDate) || "") + " から " + (fmtJPy(pi.endDate) || "") + " まで", span: 3 }]]));
+    b.push(tblXml([[lab("総合的な援助の方針", { span: 4 })]]));
+    b.push(tblXml([[{ t: pi.policy || "", span: 4 }]]));
+    b.push(tblXml([[lab("長期目標", { span: 1 }), { t: pi.longGoal || "", span: 5 }], [lab("短期目標", { span: 1 }), { t: pi.shortGoal || "", span: 5 }]]));
+    b.push(tblXml([[lab("達成状況の評価", { span: 5 })]]));
+    var rows = [[lab("優先順位"), lab("具体的な到達目標"), lab("達成状況の評価"), lab("支援内容と課題分析"), lab("今後の対応")]];
+    (m.items || []).forEach(function (it) { rows.push([{ t: it.priority || "" }, { t: it.goal || "" }, { t: it.eval || "" }, { t: it.analysis || "" }, { t: it.action || "" }]); });
+    b.push(tblXml(rows));
+    b.push(tblXml([[lab("現時点での一般就労の可能性"), { t: m.job || "" }, lab("他のサービス移行の可能性"), { t: m.transfer || "" }, lab("他事業所利用の可能性"), { t: m.otherOrg || "" }]]));
+    b.push(tblXml([[lab("更新の必要性"), { t: m.updateNeeded || "" }, lab("上記の判断の理由"), { t: m.reason || "", span: 3 }]]));
+    b.push(tblXml([[lab("事業所名"), { t: m.orgName || "" }, lab("モニタリング実施日"), { t: fmtJPy(m.date) || "" }, lab("サービス管理責任者"), { t: m.manager || "" }]]));
+    buildDocx(b, "モニタリング").then(function (blob) { downloadBlob(blob, "モニタリング_" + state.user.name + ".docx"); });
+  });
+}
+function exportMeetingDocx(id) {
+  dbGetAll("meetings").then(function (mtgs) {
+    var m = mtgs.find(function (x) { return x.id === id; }); if (!m) return;
+    var b = [];
+    b.push(hXml("会 議 録"));
+    b.push(tblXml([[lab("開催日時"), { t: (fmtJPy(m.date) || "") + " " + (m.time || "") }, lab("場所"), { t: m.place || "" }]]));
+    b.push(tblXml([[lab("対象利用者"), { t: state.user.name || "" }, lab("事業所名"), { t: m.orgName || "" }]]));
+    b.push(tblXml([[lab("議題", { span: 1 }), { t: m.agenda || "", span: 3 }]]));
+    b.push(tblXml([[lab("協議内容", { span: 1 }), { t: m.content || "", span: 3 }]]));
+    b.push(tblXml([[lab("決定事項", { span: 1 }), { t: m.decision || "", span: 3 }]]));
+    b.push(tblXml([[lab("次回予定"), { t: fmtJPy(m.nextDate) || "" }]]));
+    b.push(tblXml([[lab("参加者（署名・押印）", { span: 4 })]]));
+    var rows = [[lab("氏名"), lab("役職"), lab("署名・押印", { span: 2 })]];
+    (m.participants || []).forEach(function (p) { rows.push([{ t: p.name || "" }, { t: p.role || "" }, { t: "", span: 2 }]); });
+    b.push(tblXml(rows));
+    buildDocx(b, "会議録").then(function (blob) { downloadBlob(blob, "会議録_" + state.user.name + ".docx"); });
+  });
 }
 
 // ============ 印刷 ============
@@ -1388,7 +2156,8 @@ function renderCalendar() {
   document.getElementById("calYear").value = y;
   Promise.all([dbGetAll("users"), dbGetAll("plans"), dbGetAll("monitors")]).then(function (r) {
     var users = r[0], plans = r[1], mons = r[2];
-    var orgPlans = plans.filter(function (p) { return p.orgId === state.org.id; });
+    var orgId = state.org ? state.org.id : null;
+    var orgPlans = plans.filter(function (p) { return orgId !== null && p.orgId === orgId; });
     var monthKey = function (dstr) { return dstr ? dstr.slice(0, 7) : ""; };
     var t = document.getElementById("calTable");
     var html = "<tr><th>利用者</th>";
@@ -1405,7 +2174,7 @@ function renderCalendar() {
           if (monthKey(p.startDate) === key) cell.push("<span class='tag blue'>開始</span>");
           if (monthKey(p.endDate) === key) cell.push("<span class='tag orange'>▲更新</span>");
         });
-        var ms = mons.filter(function (mo) { return mo.userId === u.id && mo.orgId === state.org.id && monthKey(mo.date) === key; });
+        var ms = mons.filter(function (mo) { return mo.userId === u.id && (orgId === null || mo.orgId === orgId) && monthKey(mo.date) === key; });
         if (ms.length) cell.push("<span class='tag green'>モ×" + ms.length + "</span>");
         html += "<td style='text-align:center'>" + cell.join(" ") + "</td>";
       }
@@ -1453,28 +2222,34 @@ function exportWord() {
       var u = users.find(function (x) { return x.id === uidV; });
       var p = plans.find(function (x) { return x.id === pid; });
       if (!u || !p) return;
-      var draftMark = p.status === "draft" ? "<p style='text-align:center;color:#b3261e;font-weight:bold'>（案）</p>" : "";
-      var rows = (p.items || []).map(function (it) {
-        return "<tr><td style='text-align:center'>" + esc(it.priority) + "</td><td>" + esc(it.need) + "</td><td>" + esc(it.goal) + "</td><td>" + esc(it.support) + "</td><td>" + esc(it.period) + "</td><td>" + esc(it.provider) + "</td></tr>";
-      }).join("");
-      var body =
-        '<h2 style="text-align:center">個別支援計画</h2>' + draftMark +
-        '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">' +
-        "<tr><td><b>利用者氏名</b></td><td>" + esc(u.name) + "</td><td><b>個別支援計画 作成年月日</b></td><td>" + fmtJPy(p.createdDate) + "</td></tr>" +
-        "<tr><td><b>支援提供期間</b></td><td colspan='3'>" + fmtJPy(p.startDate) + " から " + fmtJPy(p.endDate) + " まで</td></tr></table>" +
-        '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%"><tr><td><b>総合的な援助の方針</b></td></tr><tr><td>' + esc(p.policy) + "</td></tr></table>" +
-        '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">' +
-        "<tr><td rowspan='2'><b>到達目標</b></td><td><b>長期目標</b></td><td>" + esc(p.longGoal) + "</td></tr>" +
-        "<tr><td><b>短期目標</b></td><td>" + esc(p.shortGoal) + "</td></tr></table>" +
-        '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">' +
-        "<tr><th>優先順位</th><th>ニーズ・課題</th><th>具体的な到達目標</th><th>支援内容</th><th>支援期間</th><th>サービス提供機関</th></tr>" + rows + "</table>" +
-        '<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">' +
-        "<tr><td><b>事業所名</b></td><td>" + esc(p.orgName) + "</td></tr>" +
-        "<tr><td><b>" + fmtJPy(p.confirmedDate || "") + "</b></td><td>利用者氏名 " + esc(u.name) + "</td><td><b>サービス管理責任者</b></td><td>" + esc(p.manager) + "</td></tr></table>";
-      var doc =
-        "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'>" +
-        "<head><meta charset='utf-8'><title>個別支援計画</title></head><body>" + body + "</body></html>";
-      download("個別支援計画_" + u.name + "_第" + (p.version || 1) + "期.doc", doc, "application/msword");
+      var b = [];
+      b.push(hXml("個別支援計画"));
+      if (p.status === "draft") b.push(pXml("（案）", { align: "center", bold: true, size: "24", color: "B3261E" }));
+      b.push(tblXml([
+        [lab("利用者氏名"), { t: u.name || "" }, lab("個別支援計画作成年月日"), { t: fmtJPy(p.createdDate) || "" }],
+        [lab("支援提供期間"), { t: (fmtJPy(p.startDate) || "") + "　から　" + (fmtJPy(p.endDate) || "") + "　まで", span: 3 }]
+      ], [1600, 3646, 2700, 2600]));
+      b.push(tblXml([[lab("総合的な援助の方針")], [{ t: p.policy || "" }]], [10546], { minRowH: 700 }));
+      b.push(tblXml([
+        [{ t: "到　達　目　標", bold: true, align: "center", shade: "F0F2F5", valign: "center", vm: "r" }, lab("長期目標"), { t: p.longGoal || "" }],
+        [{ vm: "c" }, lab("短期目標"), { t: p.shortGoal || "" }]
+      ], [1700, 2300, 6546], { minRowH: 600 }));
+      b.push(tblXml([[lab("具体的な到達目標及び支援計画等")]], [10546]));
+      var rows = [[lab("優先\n順位"), lab("ニーズ・課題"), lab("具体的な到達目標"), lab("支援内容（内容、留意点等）"), lab("支援\n期間"), lab("サービス提供機関（提供者・担当者等）")]];
+      (p.items || []).forEach(function (it) {
+        rows.push([
+          { t: it.priority || "", align: "center", valign: "center" },
+          { t: it.need || "" },
+          { t: it.goal || "" },
+          { t: it.support || "" },
+          { t: it.period || "", valign: "center" },
+          { t: it.provider || "", valign: "center" }
+        ]);
+      });
+      b.push(tblXml(rows, [850, 1790, 1900, 3325, 685, 1996]));
+      b.push(tblXml([[lab("事業所名"), { t: p.orgName || "", span: 3 }]], [1600, 3646, 2700, 2600]));
+      b.push(tblXml([[lab("確定日"), { t: fmtJPy(p.confirmedDate) || "" }, lab("サービス管理責任者"), { t: p.manager || "" }]], [1600, 3646, 2700, 2600]));
+      buildDocx(b, "個別支援計画").then(function (blob) { downloadBlob(blob, "個別支援計画_" + u.name + "_第" + (p.version || 1) + "期.docx"); });
     });
   });
 }
@@ -1512,11 +2287,11 @@ function exportCSV(kind) {
   });
 }
 function exportBackup() {
-  Promise.all(STORES.map(function (s) { return dbGetAll(s); })).then(function (all) {
-    var data = { app: "kobetsu-plan-backup", exported: new Date().toISOString() };
+  var data = { app: "kobetsu-plan-backup", enc: true, version: 1, exported: new Date().toISOString() };
+  Promise.all(STORES.map(function (s) { return rawGetAll(s); })).then(function (all) {
     STORES.forEach(function (s, i) { data[s] = all[i]; });
-    download("プラン管理バックアップ_" + todayStr() + ".json", JSON.stringify(data, null, 2), "application/json");
-    alert("バックアップを書き出しました");
+    download("プラン管理バックアップ_" + todayStr() + ".json", JSON.stringify(data), "application/json");
+    alert("暗号化されたバックアップを書き出しました（同じパスフレーズで復元できます）");
   });
 }
 function importBackup() {
@@ -1529,14 +2304,29 @@ function importBackup() {
       var data = JSON.parse(reader.result);
       if (data.app !== "kobetsu-plan-backup") { alert("このアプリのバックアップファイルではありません"); return; }
       var tx = DB.transaction(STORES, "readwrite");
-      STORES.forEach(function (s) {
-        var st = tx.objectStore(s);
-        st.clear();
-        (data[s] || []).forEach(function (o) { st.put(o); });
-      });
+      STORES.forEach(function (s) { tx.objectStore(s).clear(); });
       tx.oncomplete = function () {
-        alert("バックアップを取り込みました");
-        toOrgSelect();
+        var tx2 = DB.transaction(STORES, "readwrite");
+        STORES.forEach(function (s) { (data[s] || []).forEach(function (o) { tx2.objectStore(s).put(o); }); });
+        tx2.oncomplete = function () {
+          var meta = (data.meta || []).find(function (x) { return x.id === "enc"; });
+          if (meta) {
+            ENC_SALT = b64ToBuf(meta.salt);
+            VERIFIER = meta.ver;
+            deriveKey(SESSION_PASS, ENC_SALT).then(function (k) {
+              SESSION_KEY = k;
+              checkVerifier(VERIFIER).then(function (ok) {
+                if (ok) alert("バックアップを取り込みました");
+                else alert("バックアップを取り込みましたが、現在のパスフレーズでは復号できません。バックアップ作成時のパスフレーズで再ログインしてください。");
+                toOrgSelect();
+              });
+            }).catch(function () { alert("バックアップを取り込みましたが鍵の検証に失敗しました"); toOrgSelect(); });
+          } else {
+            alert("バックアップを取り込みました（暗号設定なしの旧形式）");
+            toOrgSelect();
+          }
+        };
+        tx2.onerror = function () { alert("取り込みに失敗しました"); };
       };
       tx.onerror = function () { alert("取り込みに失敗しました"); };
     } catch (e) { alert("ファイルを読み込めませんでした（形式が正しくありません）"); }
@@ -1544,10 +2334,50 @@ function importBackup() {
   reader.readAsText(fileEl.files[0]);
 }
 
-// ============ 初期化 ============
-document.getElementById("wordUserSel").addEventListener("change", wordUserChanged);
-
-openDB().then(function () {
+// ============ ロック・暗号化管理 ============
+// 全角ASCII（ＦＦ０１〜ＦＦ５Ｅ）を半角ASCIIに、全角スペース（Ｕ＋３０００）を半角スペースに正規化する
+function normalizePass(s) {
+  return String(s == null ? "" : s)
+    .replace(/[\uFF01-\uFF5E]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
+    .replace(/\u3000/g, " ");
+}
+function makeVerifier() {
+  var iv = crypto.getRandomValues(new Uint8Array(12));
+  return crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, SESSION_KEY, strToBuf(VERIFY_TEXT)).then(function (ct) {
+    return { iv: bufToB64(iv), ct: bufToB64(ct) };
+  });
+}
+function checkVerifier(v) {
+  return crypto.subtle.decrypt({ name: "AES-GCM", iv: b64ToBuf(v.iv) }, SESSION_KEY, b64ToBuf(v.ct)).then(function (pt) {
+    return bufToStr(pt) === VERIFY_TEXT;
+  }).catch(function () { return false; });
+}
+function saveMeta() {
+  return rawPut("meta", { id: "enc", salt: bufToB64(ENC_SALT), ver: VERIFIER });
+}
+function loadMeta() {
+  return rawGetAll("meta").then(function (arr) { return arr.find(function (x) { return x.id === "enc"; }); });
+}
+function migratePlaintext() {
+  return Promise.all(STORES.map(function (s) {
+    if (s === "meta") return Promise.resolve();
+    return rawGetAll(s).then(function (recs) {
+      return Promise.all(recs.map(function (r) {
+        if (r && r.ct == null) return dbPut(s, r); // 暗号化前の平文を再暗号化
+        return Promise.resolve();
+      }));
+    });
+  }));
+}
+function showLock(setup) {
+  document.getElementById("screen-lock").classList.remove("hidden");
+  document.getElementById("lock-setup").style.display = setup ? "block" : "none";
+  document.getElementById("lock-unlock").style.display = setup ? "none" : "block";
+  document.getElementById("lockErr").textContent = "";
+  if (!setup) document.getElementById("lockPass").value = "";
+}
+function enterApp() {
+  document.getElementById("screen-lock").classList.add("hidden");
   if (navigator.storage && navigator.storage.persist) {
     navigator.storage.persist().then(function (granted) {
       document.getElementById("persistInfo").textContent = granted
@@ -1558,7 +2388,82 @@ openDB().then(function () {
   renderOrgSelect();
   showScreen("screen-org-select");
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
-}).catch(function (e) { alert("データベースを開けませんでした: " + e); });
+}
+async function doSetup() {
+  var btn = document.querySelector("#lock-setup .btn");
+  var p1 = normalizePass(document.getElementById("lockPass1").value);
+  var p2 = normalizePass(document.getElementById("lockPass2").value);
+  document.getElementById("lockErr").textContent = "";
+  if (!p1 || p1.length < 4) { document.getElementById("lockErr").textContent = "パスフレーズは4文字以上で入力してください"; return; }
+  if (p1 !== p2) { document.getElementById("lockErr").textContent = "パスフレーズが一致しません"; return; }
+  btn.disabled = true;
+  btn.textContent = "設定中…";
+  try {
+    ENC_SALT = crypto.getRandomValues(new Uint8Array(16));
+    SESSION_PASS = p1;
+    SESSION_KEY = await deriveKey(p1, ENC_SALT);
+    VERIFIER = await makeVerifier();
+    await saveMeta();
+    await migratePlaintext();
+    enterApp();
+  } catch (e) {
+    console.error("セットアップに失敗しました", e);
+    document.getElementById("lockErr").textContent = "セットアップに失敗しました。もう一度お試しください";
+    btn.disabled = false;
+    btn.textContent = "設定して開始";
+  }
+}
+async function doUnlock() {
+  var btn = document.querySelector("#lock-unlock .btn");
+  var p = normalizePass(document.getElementById("lockPass").value);
+  document.getElementById("lockErr").textContent = "";
+  if (!p) { document.getElementById("lockErr").textContent = "パスフレーズを入力してください"; return; }
+  btn.disabled = true;
+  btn.textContent = "解除中…";
+  try {
+    var meta = await loadMeta();
+    if (!meta) { showLock(true); return; }
+    ENC_SALT = b64ToBuf(meta.salt);
+    SESSION_PASS = p;
+    SESSION_KEY = await deriveKey(p, ENC_SALT);
+    var ok = await checkVerifier(meta.ver);
+    if (!ok) { SESSION_KEY = null; document.getElementById("lockErr").textContent = "パスフレーズが違います"; return; }
+    VERIFIER = meta.ver;
+    await migratePlaintext();
+    enterApp();
+  } catch (e) {
+    console.error("解除に失敗しました", e);
+    document.getElementById("lockErr").textContent = "解除に失敗しました。もう一度お試しください";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "解除";
+  }
+}
+function resetAll() {
+  if (!confirm("すべてのデータ（事業所・利用者・計画・記録・暗号設定）を削除します。この操作は取り消せません。本当によろしいですか？")) return;
+  var p1 = prompt("削除の最終確認：現在のパスフレーズを入力してください");
+  if (p1 === null) return;
+  var p2 = prompt("もう一度、同じパスフレーズを入力してください");
+  if (p2 === null) return;
+  if (normalizePass(p1) !== normalizePass(p2)) { alert("パスフレーズが一致しません。削除を中止しました。"); return; }
+  if (normalizePass(p1) !== SESSION_PASS) { alert("パスフレーズが正しくありません。削除を中止しました。"); return; }
+  var tx = DB.transaction(STORES, "readwrite");
+  STORES.forEach(function (s) { tx.objectStore(s).clear(); });
+  tx.oncomplete = function () { location.reload(); };
+}
+
+// ============ 初期化 ============
+document.getElementById("wordUserSel").addEventListener("change", wordUserChanged);
+
+openDB().then(function () {
+  return loadMeta();
+}).then(function (meta) {
+  // 初回（meta未登録）は手動セットアップ画面、2回目以降は解除画面を表示
+  showLock(!meta);
+}).catch(function (e) {
+  console.error("初期化に失敗しました", e);
+  alert("データベースを開けませんでした: " + e);
+});
 </script>
 </body>
 </html>
