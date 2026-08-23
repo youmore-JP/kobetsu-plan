@@ -1588,6 +1588,8 @@ function editAdd(path) { var c = getPath(EDIT.obj, path); if (!Array.isArray(c))
 function editDel(path, i) { var c = getPath(EDIT.obj, path); if (Array.isArray(c)) { c.splice(i, 1); if (EDIT.render) EDIT.render(); } }
 function edCell(path, val, multiline, attrs) { val = val == null ? "" : val; var a = attrs || ""; if (multiline) return '<textarea class="ed-cell" data-path="' + path + '" ' + a + ">" + esc(val) + "</textarea>"; return '<input class="ed-cell" data-path="' + path + '" value="' + esc(val) + '" ' + a + ">"; }
 function edSelect(path, val, opts) { var o = opts.map(function (v) { return "<option" + (v === val ? " selected" : "") + ">" + esc(v) + "</option>"; }).join(""); return '<select class="ed-cell" data-path="' + path + '">' + o + "</select>"; }
+function edGrow(ta) { ta.style.height = "auto"; ta.style.height = (ta.scrollHeight + 3) + "px"; }
+function edGrowAll() { document.querySelectorAll("textarea.ed-cell").forEach(function (t) { edGrow(t); }); }
 function edToolbar(title, msgId, wordFn) {
   EDIT.msgId = msgId;
   var wordBtn = wordFn ? '<button class="btn sec small" onclick="' + wordFn + '">Word出力</button> ' : "";
@@ -1597,7 +1599,7 @@ function edToolbar(title, msgId, wordFn) {
     '<span class="hint" id="' + msgId + '"></span></div>';
 }
 if (typeof document !== "undefined") {
-  document.addEventListener("input", function (e) { if (e.target.matches("[data-path]")) { editSet(e.target.getAttribute("data-path"), e.target.value); editSave(); } });
+  document.addEventListener("input", function (e) { if (e.target.matches("[data-path]")) { editSet(e.target.getAttribute("data-path"), e.target.value); editSave(); } if (e.target.matches("textarea.ed-cell")) edGrow(e.target); });
   document.addEventListener("change", function (e) { if (e.target.matches("[data-path]")) { editSet(e.target.getAttribute("data-path"), e.target.value); editSave(); } });
   document.addEventListener("click", function (e) {
     var t = e.target.closest("[data-add]"); if (t) { editAdd(t.getAttribute("data-add")); return; }
@@ -1665,6 +1667,7 @@ function renderFaceEdit() {
     '<tr><th style="width:16%">名称</th><th style="width:22%">提供機関・提供者</th><th style="width:32%">支援の内容</th><th style="width:14%">頻度</th><th>備考</th><th style="width:34px"></th></tr>' + oth + "</table>" +
     '<button class="btn sec small ed-add" data-add="face.supports.other">＋ その他の支援を追加</button>';
   showScreen("screen-face-edit");
+  edGrowAll();
 }
 
 function renderPlanEdit(id) {
@@ -1698,7 +1701,8 @@ function renderPlanEdit(id) {
       '<table class="pf"><tr><td class="lab">事業所名</td><td>' + edCell("orgName", p.orgName) + "</td></tr>" +
       '<tr><td class="lab" style="width:16%">確定日</td><td style="width:40%">' + edCell("confirmedDate", p.confirmedDate, false, 'style="width:130px"') + "</td>" +
       '<td class="lab" style="width:16%">サービス管理責任者</td><td>' + edCell("manager", p.manager) + "</td></tr></table>";
-    showScreen("screen-plan-edit");
+  showScreen("screen-plan-edit");
+  edGrowAll();
   });
 }
 
@@ -1736,7 +1740,8 @@ function renderMonitorEdit(id) {
       '<table class="pf"><tr><td class="lab2">上記の判断の理由</td></tr><tr><td>' + edCell("reason", m.reason, true) + "</td></tr></table>" +
       '<table class="pf"><tr><td class="lab">事業所名</td><td>' + edCell("orgName", m.orgName) + '</td><td class="lab">モニタリング実施日</td><td>' + edCell("date", m.date, false, 'style="width:130px"') + "</td>" +
       '<td class="lab">サービス管理責任者</td><td>' + edCell("manager", m.manager) + "</td></tr></table>";
-    showScreen("screen-monitor-edit");
+  showScreen("screen-monitor-edit");
+  edGrowAll();
   });
 }
 
@@ -1766,7 +1771,8 @@ function renderMeetingEdit(id) {
       '<table class="pf"><tr><td class="lab2">参加者（署名・押印）</td></tr></table>' +
       '<table class="pf"><tr><th style="width:34%">氏名</th><th style="width:26%">役職</th><th style="width:40%">署名・押印</th><th style="width:34px"></th></tr>' + rows + "</table>" +
       '<button class="btn sec small ed-add" data-add="participants">＋ 参加者を追加</button>';
-    showScreen("screen-meeting-edit");
+  showScreen("screen-meeting-edit");
+  edGrowAll();
   });
 }
 
