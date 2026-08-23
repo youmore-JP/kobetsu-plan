@@ -1827,7 +1827,7 @@ function tblXml(rows, widths, opts) {
   var border = "<w:tblBorders>" + ["top", "left", "bottom", "right", "insideH", "insideV"].map(function (b) { return "<w:" + b + " w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"auto\"/>"; }).join("") + "</w:tblBorders>";
   var cellMar = "<w:tblCellMar><w:top w:w=\"60\" w:type=\"dxa\"/><w:left w:w=\"100\" w:type=\"dxa\"/><w:bottom w:w=\"60\" w:type=\"dxa\"/><w:right w:w=\"100\" w:type=\"dxa\"/></w:tblCellMar>";
   var trH = opts.minRowH ? opts.minRowH : 200;
-  var trs = rows.map(function (r) {
+  var trs = rows.map(function (r, ri) {
     var ci = 0;
     var tcs = r.map(function (c) {
       c = c || {};
@@ -1840,7 +1840,10 @@ function tblXml(rows, widths, opts) {
       var tcPr = "<w:tcPr><w:tcW w:w=\"" + w + "\" w:type=\"dxa\"/>" + (span > 1 ? "<w:gridSpan w:val=\"" + span + "\"/>" : "") + vm + shd + va + "</w:tcPr>";
       return "<w:tc>" + tcPr + cellXml(c.vm === "c" ? "" : (c.t == null ? "" : c.t), c) + "</w:tc>";
     }).join("");
-    return "<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val=\"" + trH + "\" w:hRule=\"atLeast\"/></w:trPr>" + tcs + "</w:tr>";
+    var trpr = "<w:cantSplit/>";
+    if (ri === 0 && opts.headerRepeat) trpr = "<w:tblHeader/>";
+    else if (opts.splitRows) trpr = "";
+    return "<w:tr><w:trPr>" + trpr + "<w:trHeight w:val=\"" + trH + "\" w:hRule=\"atLeast\"/></w:trPr>" + tcs + "</w:tr>";
   }).join("");
   var tblW = fixed ? "<w:tblW w:w=\"" + ws.reduce(function (a2, b2) { return a2 + b2; }, 0) + "\" w:type=\"dxa\"/>" : "<w:tblW w:w=\"5000\" w:type=\"pct\"/>";
   var layout = fixed ? "<w:tblLayout w:type=\"fixed\"/>" : "<w:tblLayout w:type=\"autofit\"/>";
@@ -1848,6 +1851,7 @@ function tblXml(rows, widths, opts) {
 }
 function hXml(text) { return "<w:p><w:pPr><w:keepNext/><w:spacing w:before=\"0\" w:after=\"80\" w:line=\"280\" w:lineRule=\"auto\"/><w:jc w:val=\"center\"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val=\"32\"/></w:rPr><w:t xml:space=\"preserve\">" + xesc(text) + "</w:t></w:r></w:p>"; }
 function pXml(text, opts) { opts = opts || {}; var ppr = opts.align ? "<w:jc w:val=\"" + opts.align + "\"/>" : ""; var rpr = ""; if (opts.bold) rpr += "<w:b/>"; if (opts.color) rpr += "<w:color w:val=\"" + opts.color + "\"/>"; if (opts.size) rpr += "<w:sz w:val=\"" + opts.size + "\"/>"; rpr = rpr ? "<w:rPr>" + rpr + "</w:rPr>" : ""; var sp = "<w:spacing w:before=\"0\" w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/>"; return "<w:p><w:pPr>" + sp + ppr + "</w:pPr><w:r>" + rpr + "<w:t xml:space=\"preserve\">" + xesc(text) + "</w:t></w:r></w:p>"; }
+function pbXml() { return "<w:p><w:pPr><w:spacing w:before=\"0\" w:after=\"0\"/></w:pPr><w:r><w:br w:type=\"page\"/></w:r></w:p>"; }
 async function buildDocx(blocks, title) {
   title = title || "文書";
   var now = new Date(), pad2 = function (n) { return (n < 10 ? "0" : "") + n; };
@@ -1951,10 +1955,11 @@ function exportMonitorDocx(id) {
     b.push(tblXml([[lab("総合的な援助の方針", { span: 4 })]]));
     b.push(tblXml([[{ t: pi.policy || "", span: 4 }]]));
     b.push(tblXml([[lab("長期目標", { span: 1 }), { t: pi.longGoal || "", span: 5 }], [lab("短期目標", { span: 1 }), { t: pi.shortGoal || "", span: 5 }]]));
+    b.push(pbXml());
     b.push(tblXml([[lab("達成状況の評価", { span: 5 })]]));
     var rows = [[lab("優先順位"), lab("具体的な到達目標"), lab("達成状況の評価"), lab("支援内容と課題分析"), lab("今後の対応")]];
     (m.items || []).forEach(function (it) { rows.push([{ t: it.priority || "" }, { t: it.goal || "" }, { t: it.eval || "" }, { t: it.analysis || "" }, { t: it.action || "" }]); });
-    b.push(tblXml(rows));
+    b.push(tblXml(rows, [700, 2200, 1700, 3100, 2846], { headerRepeat: true, splitRows: true }));
     b.push(tblXml([[lab("現時点での一般就労の可能性"), { t: m.job || "" }, lab("他のサービス移行の可能性"), { t: m.transfer || "" }, lab("他事業所利用の可能性"), { t: m.otherOrg || "" }]]));
     b.push(tblXml([[lab("更新の必要性"), { t: m.updateNeeded || "" }, lab("上記の判断の理由"), { t: m.reason || "", span: 3 }]]));
     b.push(tblXml([[lab("事業所名"), { t: m.orgName || "" }, lab("モニタリング実施日"), { t: fmtJPy(m.date) || "" }, lab("サービス管理責任者"), { t: m.manager || "" }]]));
@@ -2268,7 +2273,7 @@ function exportWord() {
           { t: it.provider || "", valign: "center" }
         ]);
       });
-      b.push(tblXml(rows, [850, 1790, 1900, 3325, 685, 1996]));
+    b.push(tblXml(rows, [850, 1790, 1900, 3325, 685, 1996], { headerRepeat: true, splitRows: true }));
       b.push(tblXml([[lab("事業所名"), { t: p.orgName || "", span: 3 }]], [1600, 3646, 2700, 2600]));
       b.push(tblXml([[lab("確定日"), { t: fmtJPy(p.confirmedDate) || "" }, lab("サービス管理責任者"), { t: p.manager || "" }]], [1600, 3646, 2700, 2600]));
       buildDocx(b, "個別支援計画").then(function (blob) { downloadBlob(blob, "個別支援計画_" + u.name + "_第" + (p.version || 1) + "期.docx"); });
